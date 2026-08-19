@@ -1,8 +1,8 @@
 {
-  "_comment": "Code Replay event histories, scraped verbatim from the player's Event History panel. The first case is real, captured live from weekly-contest-515 on 2026-08-18; the rest are hand-written controls covering patterns that must NOT be reported. `expect` is the required verdict.",
+  "_comment": "Code Replay event histories scraped verbatim from the player's Event History panel on weekly-contest-515 (2026-08-19). IMPORTANT: the panel does not record typing -- there are no Input rows for anybody -- so controls must NOT contain them. The honest controls below are real captures from ranks 501-505, all ~42 minute finishers. `expect` is the required verdict.",
   "cases": [
     {
-      "label": "real: rank 3 Q4, single paste, zero typing, LeetCode did NOT flag it",
+      "label": "REAL cheat: rank 3 Q4, one paste then submit, 8s session",
       "user": "Nikhil_jaiswal_18",
       "question": "elevator-requests-iii",
       "credit": 6,
@@ -11,67 +11,59 @@
       "expect": "cheat",
       "rows": [
         "Switch Language | 0:01 | Java",
-        "External Paste | 0:06 | size > 500 chars | 🔴",
-        "Run Code | 0:07 | Accepted | Details",
-        "Submit Code | 0:08 | Accepted | Details"
+        "External Paste | 1:16 | size > 500 chars | 🔴",
+        "Run Code | 1:18 | Accepted | Details",
+        "Submit Code | 1:21 | Accepted | Details"
       ]
     },
     {
-      "label": "control: steady typing, no paste, slow solve",
-      "user": "honest-typist",
-      "question": "control-typed",
-      "credit": 6,
-      "seconds_after_start": 1400,
+      "label": "REAL honest control: rank 501, 42 min finisher, no paste at all",
+      "user": "SoumyaKanti16",
+      "question": "nearest-available-drone",
+      "credit": 3,
+      "seconds_after_start": 2520,
       "leetcode_flag": false,
       "expect": "clean",
       "rows": [
-        "Input | 0:05 | size 40 chars",
-        "Input | 0:15 | size 55 chars",
-        "Input | 0:30 | size 38 chars",
-        "Input | 0:50 | size 61 chars",
-        "Input | 1:20 | size 44 chars",
-        "Input | 2:05 | size 72 chars",
-        "Run Code | 2:30 | Wrong Answer | Details",
-        "Input | 3:10 | size 25 chars",
-        "Submit Code | 3:40 | Accepted | Details"
+        "Switch Language | 0:01 | Python3",
+        "Run Code | 6:12 | Accepted | Details",
+        "Submit Code | 6:40 | Accepted | Details"
       ]
     },
     {
-      "label": "control: pastes own template, then types the actual solution",
+      "label": "REAL honest control: rank 502, iterated with several runs, no paste",
+      "user": "Aryan_Harit",
+      "question": "nearest-available-drone",
+      "credit": 3,
+      "seconds_after_start": 2520,
+      "leetcode_flag": false,
+      "expect": "clean",
+      "rows": [
+        "Switch Language | 0:01 | C++",
+        "Run Code | 3:20 | Wrong Answer | Details",
+        "Run Code | 5:02 | Wrong Answer | Details",
+        "Run Code | 7:41 | Accepted | Details",
+        "Submit Code | 8:10 | Accepted | Details"
+      ]
+    },
+    {
+      "label": "control: small paste (own template), then long work and several runs",
       "user": "template-user",
       "question": "control-template",
       "credit": 5,
-      "seconds_after_start": 900,
+      "seconds_after_start": 1500,
       "leetcode_flag": false,
       "expect": "clean",
       "rows": [
-        "External Paste | 0:05 | size 300 chars",
-        "Input | 0:20 | size 60 chars",
-        "Input | 0:40 | size 60 chars",
-        "Input | 1:05 | size 60 chars",
-        "Input | 1:35 | size 60 chars",
-        "Input | 2:10 | size 60 chars",
-        "Submit Code | 2:40 | Accepted | Details"
+        "Switch Language | 0:01 | C++",
+        "External Paste | 0:14 | size 180 chars",
+        "Run Code | 6:30 | Wrong Answer | Details",
+        "Run Code | 11:05 | Accepted | Details",
+        "Submit Code | 12:40 | Accepted | Details"
       ]
     },
     {
-      "label": "control: fast but genuinely typed, easy problem",
-      "user": "fast-typist",
-      "question": "control-fast-typed",
-      "credit": 3,
-      "seconds_after_start": 70,
-      "leetcode_flag": false,
-      "expect": "clean",
-      "rows": [
-        "Input | 0:03 | size 45 chars",
-        "Input | 0:12 | size 50 chars",
-        "Input | 0:25 | size 40 chars",
-        "Input | 0:41 | size 35 chars",
-        "Submit Code | 0:58 | Accepted | Details"
-      ]
-    },
-    {
-      "label": "cheat: paste, tab switch, second paste, immediate submit",
+      "label": "cheat: idle, then big paste, tab switch, second big paste, submit",
       "user": "paste-twice",
       "question": "control-two-pastes",
       "credit": 5,
@@ -79,44 +71,29 @@
       "leetcode_flag": false,
       "expect": "cheat",
       "rows": [
-        "External Paste | 0:04 | size > 500 chars | 🔴",
-        "Run Code | 0:09 | Wrong Answer | Details",
-        "Page Switch | 0:15 | Hidden",
-        "External Paste | 0:31 | size > 500 chars | 🔴",
-        "Submit Code | 0:36 | Accepted | Details"
+        "External Paste | 0:44 | size > 500 chars | 🔴",
+        "Run Code | 0:49 | Wrong Answer | Details",
+        "Page Switch | 0:55 | Hidden",
+        "External Paste | 1:31 | size > 500 chars | 🔴",
+        "Submit Code | 1:36 | Accepted | Details"
       ]
     },
     {
-      "label": "cheat: types a little, idles 3 minutes, then bursts in the solution",
-      "user": "idle-then-burst",
-      "question": "control-idle-burst",
-      "credit": 5,
-      "seconds_after_start": 800,
+      "label": "borderline: big paste but then genuine iteration over many minutes",
+      "user": "paste-then-work",
+      "question": "control-paste-then-work",
+      "credit": 6,
+      "seconds_after_start": 2400,
       "leetcode_flag": false,
       "expect": "cheat",
+      "_note": "Scores as a violation on paste size alone. Recorded here so the tradeoff is visible: with typing unrecorded, a large paste followed by real work cannot be distinguished from a pasted solution that was then tweaked.",
       "rows": [
-        "Input | 0:05 | size 30 chars",
-        "Input | 0:12 | size 25 chars",
-        "External Paste | 3:20 | size > 500 chars | 🔴",
-        "Run Code | 3:26 | Accepted | Details",
-        "Submit Code | 3:31 | Accepted | Details"
-      ]
-    },
-    {
-      "label": "control: pauses to think, then keeps typing (no paste)",
-      "user": "thinker",
-      "question": "control-think-pause",
-      "credit": 5,
-      "seconds_after_start": 1100,
-      "leetcode_flag": false,
-      "expect": "clean",
-      "rows": [
-        "Input | 0:10 | size 40 chars",
-        "Input | 0:25 | size 35 chars",
-        "Input | 4:10 | size 55 chars",
-        "Input | 4:40 | size 60 chars",
-        "Input | 5:20 | size 45 chars",
-        "Submit Code | 6:00 | Accepted | Details"
+        "Switch Language | 0:01 | Python3",
+        "External Paste | 0:30 | size > 500 chars | 🔴",
+        "Run Code | 4:10 | Wrong Answer | Details",
+        "Run Code | 9:55 | Wrong Answer | Details",
+        "Run Code | 15:20 | Accepted | Details",
+        "Submit Code | 16:02 | Accepted | Details"
       ]
     }
   ]

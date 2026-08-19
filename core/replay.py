@@ -33,7 +33,8 @@ ROW_FROM_LINK = ('xpath=ancestor::div[contains(@class,"h-[50px]")'
                  ' and contains(@class,"w-full")][1]')
 # Same container, addressed directly. Attribute-substring matching avoids having
 # to escape Tailwind's square brackets in a CSS class selector.
-ROW_SELECTOR = 'div[class*="h-[50px]"][class*="w-full"]'
+ROW_SELECTOR = ('div[class*="h-[50px]"][class*="w-full"]'
+                '[class*="min-w-[fit-content]"]')
 PAGE_SIZE = 25
 
 INPUT = "Input"

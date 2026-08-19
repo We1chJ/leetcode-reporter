@@ -46,9 +46,11 @@ def main():
 
         print(f"  [{mark}] {verdict:<5} {score:<5} {reason or '-'}")
         print(f"         {c['label']}")
-        print(f"         typed={ev.get('typed_chars')} pasted={ev.get('pasted_chars')} "
-              f"inputs={ev.get('input_events')} pastes={ev.get('paste_events')} "
-              f"lc_flag={ev.get('leetcode_insufficient_activity')}")
+        print(f"         pastes={ev.get('paste_events')} "
+              f"largest={ev.get('largest_paste_chars')}ch "
+              f"idle_before={ev.get('idle_before_largest_paste')}s "
+              f"paste->submit={ev.get('paste_to_submit_seconds')}s "
+              f"runs_after={ev.get('runs_after_last_paste')}")
 
     fatal = [f for f in failures if f[3]]
     print()

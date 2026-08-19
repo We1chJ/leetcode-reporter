@@ -32,30 +32,44 @@ start · switchQuestion · switchLang · pageVisible (Page Switch) · interpretC
 submitCode · end · input · undo · redo · paste (External Paste) · changeCursor · debug
 ```
 
-`Input` is typing in the editor. `External Paste` is LeetCode's own label for
-content arriving from outside it. A submission with pastes and no Input events
-was not written in the editor. Real example, rank 3's Q4 on weekly-contest-515:
+**Typing is not recorded.** The panel lists only notable events, never
+keystrokes. Honest contestants (ranks 501-505, ~42 minute finishers) look like
+this:
+
+```
+Switch Language | 0:01 | Python3
+Run Code        | 6:12 | Accepted
+Submit Code     | 6:40 | Accepted
+```
+
+so "no typing events" is true of everybody and carries no information. The real
+discriminator is the **External Paste** event, which honest controls do not have
+at all. A blatant case, rank 3's Q4:
 
 ```
 Switch Language | 0:01 | Java
-External Paste  | 0:06 | size > 500 chars | 🔴
-Run Code        | 0:07 | Accepted
-Submit Code     | 0:08 | Accepted
+External Paste  | 1:16 | size > 500 chars | 🔴
+Run Code        | 1:18 | Accepted
+Submit Code     | 1:21 | Accepted
 ```
-
-A commented Java bitmask DP, in four events and eight seconds.
 
 | Reason code | Meaning | Score |
 |---|---|---|
-| `PASTE_NO_TYPING` | External pastes present, zero Input events | 1.00 |
-| `PASTE_DOMINANT` | Solution arrived almost entirely by paste | 0.97 |
-| `BURST_AFTER_IDLE` | Long inactivity, then a sudden large paste | 0.96 |
-| `LARGE_EXTERNAL_PASTE` | A single paste big enough to be the whole solution | 0.93 |
-| `PASTE_THEN_IMMEDIATE_SUBMIT` | Submitted seconds after the last paste | 0.90 |
+| `LARGE_PASTE_THEN_SUBMIT` | Large external paste, submitted seconds later | 0.96 |
+| `BURST_AFTER_IDLE` | Long silence, then one large external paste | 0.95 |
+| `REPEATED_LARGE_PASTES` | More than one large external paste | 0.93 |
+| `LARGE_EXTERNAL_PASTE` | A paste big enough to be the whole solution | 0.90 |
 | `IMPLAUSIBLE_SOLVE_SPEED` | Fallback when no replay exists; never auto-reports | ≤ 0.90 |
 
 At or above `cheat_threshold` (0.95) a report is filed. Between `grey_low` and
 that, the submission is recorded and shown in the UI but never auto-reported.
+
+### Known limitation
+
+Because typing is not recorded, a large paste followed by genuine work cannot be
+distinguished from a pasted solution that was then tweaked. Both score as
+violations. Pasting your own boilerplate is safe only while it stays under
+`large_paste_chars` (500). There is a fixture case documenting this tradeoff.
 
 ### Inactivity, then a burst
 

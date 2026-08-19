@@ -7,26 +7,55 @@ That flag under-fires: on weekly-contest-515 it was unset on rank 3's Q4, whose
 own event history is `Switch Language -> External Paste (>500 chars) -> Run Code
 -> Submit Code` with zero Input events. It is recorded as context, nothing more.
 
-The judgment is made on the event history itself:
-  - Input events are characters typed in the editor.
-  - External Paste is LeetCode's own label for content arriving from outside it.
-  - Event timestamps give the idle gaps between activity.
+What the Event History actually contains, established by sampling honest
+contestants (ranks 501-505 of weekly-contest-515, all ~42 minute finishers):
 
-Writing a solution in the editor produces continuous incremental typing. The
-cheating pattern is the opposite shape: long inactivity, then a sudden burst of
-pasted text, then submit.
+    Switch Language -> Run Code -> Submit Code
+
+**Typing is not recorded.** The panel lists only notable events -- language
+switches, runs, submissions, external pastes, page switches -- never individual
+keystrokes. `Input` exists in LeetCode's event vocabulary but does not appear in
+practice, so "zero typing events" is true of everybody and carries no
+information. An earlier version of this module treated it as the decisive signal
+and consequently judged 73% of the top 100 as cheating.
+
+So the judgment rests on what the history does record:
+  - External Paste, LeetCode's own label for content arriving from outside the
+    editor, with a size. Honest contestants in the control sample had none.
+  - The timestamps around it: idle before the paste, and paste to submission.
+  - Whether the code was ever run between pasting and submitting.
+
+Nothing here proves the absence of typing, and no rule or report may claim it.
 """
 
 from core import config
-from core.replay import INPUT, PAGE_SWITCH, PASTE, SUBMIT
+from core.replay import PAGE_SWITCH, PASTE, RUN, SUBMIT
 
 # --- reason codes ---------------------------------------------------------
-PASTE_NO_TYPING = "PASTE_NO_TYPING"
-PASTE_DOMINANT = "PASTE_DOMINANT"
+LARGE_PASTE_THEN_SUBMIT = "LARGE_PASTE_THEN_SUBMIT"
 BURST_AFTER_IDLE = "BURST_AFTER_IDLE"
 LARGE_EXTERNAL_PASTE = "LARGE_EXTERNAL_PASTE"
-PASTE_THEN_IMMEDIATE_SUBMIT = "PASTE_THEN_IMMEDIATE_SUBMIT"
+REPEATED_LARGE_PASTES = "REPEATED_LARGE_PASTES"
 IMPLAUSIBLE_SOLVE_SPEED = "IMPLAUSIBLE_SOLVE_SPEED"
+
+# Phrased strictly in terms of what the event history records. None of these may
+# assert anything about typing, which the history does not capture.
+REASON_TEXT = {
+    LARGE_PASTE_THEN_SUBMIT:
+        "a large block of code arrived in a single external paste and was "
+        "submitted within seconds, leaving no time to read, adapt or test it",
+    BURST_AFTER_IDLE:
+        "a long stretch with no recorded editor activity was followed "
+        "immediately by one large external paste",
+    REPEATED_LARGE_PASTES:
+        "the solution arrived through more than one large external paste",
+    LARGE_EXTERNAL_PASTE:
+        "a single external paste large enough to account for the whole "
+        "solution was recorded",
+    IMPLAUSIBLE_SOLVE_SPEED:
+        "the submission was accepted far sooner after the contest opened than "
+        "reading, implementing and testing the problem plausibly permits",
+}
 
 CLEAN, GREY, CHEAT = "clean", "grey", "cheat"
 
@@ -37,7 +66,6 @@ SPEED_FLOOR = {3: 45, 4: 90, 5: 180, 6: 300}
 
 def summarise(events):
     """Reduce an event history to the numbers the rules need."""
-    inputs = [e for e in events if e["type"] == INPUT]
     pastes = [e for e in events if e["type"] == PASTE]
     submits = [e for e in events if e["type"] == SUBMIT]
 
@@ -56,19 +84,22 @@ def summarise(events):
     all_gaps = [gaps[i] for i in range(len(events))]
     return {
         "event_count": len(events),
-        "input_events": len(inputs),
         "paste_events": len(pastes),
-        "typed_chars": sum(e["chars"] or 0 for e in inputs),
         "pasted_chars": sum(e["chars"] or 0 for e in pastes),
         "largest_paste_chars": (largest["chars"] or 0) if largest else 0,
         "paste_size_is_lower_bound": any(e["chars_is_lower_bound"] for e in pastes),
         "idle_before_largest_paste": idle_before_largest,
         "longest_idle_seconds": max(all_gaps, default=0),
+        "runs_after_last_paste": sum(
+            1 for e in events
+            if e["type"] == RUN and largest is not None and e["t"] > largest["t"]),
         "page_switches": sum(1 for e in events if e["type"] == PAGE_SWITCH),
         "last_paste_t": max((e["t"] for e in pastes), default=None),
         "submit_t": max((e["t"] for e in submits), default=None),
         "session_seconds": max((e["t"] for e in events), default=0),
         "event_sequence": [e["type"] for e in events][:40],
+        # Stated explicitly so nothing downstream can imply typing was observed.
+        "typing_is_not_recorded": True,
     }
 
 
@@ -100,27 +131,24 @@ def analyse(events, sub, ctx):
         s = summarise(events)
         evidence.update(s)
         big = s["largest_paste_chars"] >= d["large_paste_chars"]
+        gap = None
+        if s["last_paste_t"] is not None and s["submit_t"] is not None:
+            gap = s["submit_t"] - s["last_paste_t"]
+            evidence["paste_to_submit_seconds"] = gap
 
-        if s["paste_events"]:
-            # Pasted in, nothing typed. The decisive pattern.
-            if s["input_events"] == 0:
-                reasons.append((PASTE_NO_TYPING, 1.0))
-            elif s["pasted_chars"] and s["typed_chars"] <= s["pasted_chars"] * (
-                    1 - d["paste_ratio"]):
-                reasons.append((PASTE_DOMINANT, 0.97))
+        if s["paste_events"] and big:
+            # Pasted the bulk of a solution in, then submitted it straight away.
+            if gap is not None and 0 <= gap <= d["instant_submit_seconds"]:
+                reasons.append((LARGE_PASTE_THEN_SUBMIT, 0.96))
 
             # Inactivity, then a sudden burst of pasted code.
-            if big and (s["idle_before_largest_paste"] or 0) >= d["idle_burst_seconds"]:
-                reasons.append((BURST_AFTER_IDLE, 0.96))
+            if (s["idle_before_largest_paste"] or 0) >= d["idle_burst_seconds"]:
+                reasons.append((BURST_AFTER_IDLE, 0.95))
 
-            if big:
-                reasons.append((LARGE_EXTERNAL_PASTE, 0.93))
+            if s["paste_events"] >= 2:
+                reasons.append((REPEATED_LARGE_PASTES, 0.93))
 
-            if s["last_paste_t"] is not None and s["submit_t"] is not None:
-                gap = s["submit_t"] - s["last_paste_t"]
-                evidence["paste_to_submit_seconds"] = gap
-                if 0 <= gap <= d["instant_submit_seconds"]:
-                    reasons.append((PASTE_THEN_IMMEDIATE_SUBMIT, 0.90))
+            reasons.append((LARGE_EXTERNAL_PASTE, 0.90))
     else:
         evidence["replay_available"] = False
 
