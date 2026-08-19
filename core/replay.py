@@ -347,6 +347,17 @@ def _close(page):
         pass
 
 
+def _event_container(page):
+    """The Event History list, if the panel is currently open.
+
+    Filtered by text because the same class signature also matches the code
+    panel next to it.
+    """
+    c = page.locator(EVENT_LIST).filter(
+        has_text=re.compile("Submit Code|Input|External Paste|Run Code"))
+    return c if c.count() else None
+
+
 def _wait_container(page, timeout_ms):
     """Wait for the Event History rows to render, then return the container."""
     try:

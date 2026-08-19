@@ -61,10 +61,14 @@ BODIES = {
         f" Stepping through LeetCode's Code Replay for this submission shows "
         f"the solution appearing all at once rather than being written. "
         f"{e.get('biggest_single_jump_chars', 0)} characters - "
-        f"{round(100 * e.get('biggest_jump_fraction', 0))}% of the finished "
-        f"{e.get('final_chars', 0)}-character solution - appear in a single "
-        f"step of the timeline, and the code grows at only "
-        f"{e.get('growth_steps', 0)} point(s) in the whole recording."
+        f"{round(100 * e.get('biggest_jump_fraction', 0))}% of the "
+        f"{e.get('peak_chars', 0)} characters the editor ever held - appear in a "
+        f"single step of the timeline, and the code grows at only "
+        f"{e.get('growth_steps', 0)} point(s) in the whole recording. The "
+        f"submitted solution is {e.get('final_chars', 0)} characters"
+        + (f", the block having been trimmed by "
+           f"{e.get('trimmed_chars')} characters after it appeared."
+           if e.get("trimmed_chars") else ".")
         + _curve(e) +
         " Code written in the editor grows steadily across the replay. This "
         "did not; it was complete the moment it appeared."),

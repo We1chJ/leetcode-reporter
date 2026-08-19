@@ -80,17 +80,22 @@ def summarise_progression(prog):
     the replay. Work done in the editor climbs steadily; a solution brought in
     from outside jumps from nothing to complete in one step.
     """
-    final = max(prog) if prog else 0
+    peak = max(prog) if prog else 0
+    final = prog[-1] if prog else 0
     steps = [prog[i + 1] - prog[i] for i in range(len(prog) - 1)]
     growth = [d for d in steps if d > 0]
     biggest = max(steps) if steps else 0
     return {
         "samples": len(prog),
+        # Peak and end differ when code is pasted and then trimmed back down,
+        # so report both rather than calling the peak "the final solution".
+        "peak_chars": peak,
         "final_chars": final,
+        "trimmed_chars": max(peak - final, 0),
         "biggest_single_jump_chars": biggest,
         # The headline number: how much of the finished solution appeared in
         # one step of the timeline. Near 1.0 means it was never written here.
-        "biggest_jump_fraction": round(biggest / final, 3) if final else 0.0,
+        "biggest_jump_fraction": round(biggest / peak, 3) if peak else 0.0,
         "growth_steps": len(growth),
         "curve": prog,
     }
@@ -170,7 +175,7 @@ def analyse(events, sub, ctx):
         evidence.update(g)
         authored = g["growth_steps"] > d["min_growth_steps"]
         evidence["shows_ongoing_authoring"] = authored
-        if g["final_chars"] >= d["min_solution_chars"] and not authored:
+        if g["peak_chars"] >= d["min_solution_chars"] and not authored:
             if g["biggest_jump_fraction"] >= d["burst_fraction"]:
                 reasons.append((CODE_APPEARS_IN_ONE_STEP, 0.98))
             else:
