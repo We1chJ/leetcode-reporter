@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from core import config
+from core import config, contest
 from core.pipeline import Pipeline
 from db import store
 
@@ -37,9 +37,9 @@ def get_config():
 def start_scan(contest_slug: str):
     if _pipeline.running:
         return {"ok": False, "error": "a scan is already running"}
-    threading.Thread(target=_pipeline.scan, args=(contest_slug,),
-                     daemon=True).start()
-    return {"ok": True}
+    slug = contest.normalise_slug(contest_slug)
+    threading.Thread(target=_pipeline.scan, args=(slug,), daemon=True).start()
+    return {"ok": True, "slug": slug}
 
 
 @app.post("/api/stop")

@@ -171,7 +171,7 @@ class Pipeline:
                                 question_index=index_of[qid], narrative=text,
                                 problem_count=len(qs),
                                 ui_page=(row["rank"] - 1) // 25 + 1,
-                                dry_run=dry_run)
+                                dry_run=dry_run, contest_submission_id=csid)
                             store.mark_report(conn, report_id, outcome)
                         except Exception as exc:
                             store.mark_report(conn, report_id, "failed", str(exc))

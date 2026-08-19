@@ -15,11 +15,33 @@ Two ranking regions return different payloads and we need both:
                         editor-activity flag, which is our primary signal.
 """
 
+import re
 import time
 
 RANKING = "/contest/api/ranking/{slug}/?pagination={page}&region={region}"
 INFO = "/contest/api/info/{slug}/"
 PAGE_SIZE = 25
+
+
+def normalise_slug(text):
+    """Accept a bare contest number as well as a full slug.
+
+    "515" -> weekly-contest-515      "b190" -> biweekly-contest-190
+    "biweekly 190" -> biweekly-contest-190
+    Anything already slug-shaped is passed through untouched.
+    """
+    t = (text or "").strip().lower().replace("_", "-")
+    if not t:
+        return t
+    if re.fullmatch(r"\d+", t):
+        return f"weekly-contest-{t}"
+    m = re.fullmatch(r"b[a-z]*[\s-]*(\d+)", t)
+    if m:
+        return f"biweekly-contest-{m.group(1)}"
+    m = re.fullmatch(r"w[a-z]*[\s-]*(\d+)", t)
+    if m:
+        return f"weekly-contest-{m.group(1)}"
+    return re.sub(r"\s+", "-", t)
 
 
 def _get(session, url):

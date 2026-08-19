@@ -17,7 +17,8 @@ CN = "c"   # LeetCode China account: replay lives on another site, skipped
 
 
 def main():
-    slug = sys.argv[1] if len(sys.argv) > 1 else "weekly-contest-515"
+    slug = contest.normalise_slug(
+        sys.argv[1] if len(sys.argv) > 1 else "weekly-contest-515")
     lo = int(sys.argv[2]) if len(sys.argv) > 2 else 1
     hi = int(sys.argv[3]) if len(sys.argv) > 3 else 25
     cfg = config.load(reload=True)

@@ -8,6 +8,7 @@ replay scraper, where a terminal log is easier to read than the browser.
 
 import sys
 
+from core import contest
 from core.pipeline import Pipeline
 
 
@@ -31,7 +32,7 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
-    Pipeline(emit).scan(sys.argv[1])
+    Pipeline(emit).scan(contest.normalise_slug(sys.argv[1]))
     return 0
 
 

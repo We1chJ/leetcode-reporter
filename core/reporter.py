@@ -75,12 +75,30 @@ def submit_report(session, narrative, dry_run=True):
     return "submitted"
 
 
+def confirm_registered(session, contest_submission_id, tries=3):
+    """Ask LeetCode whether the report actually landed.
+
+    A click that silently failed would otherwise be counted as a report sent,
+    so the count would overstate what was really filed.
+    """
+    for _ in range(tries):
+        if replay.existing_report(session, contest_submission_id):
+            return True
+        time.sleep(1.5)
+    return False
+
+
 def file_report(session, *, contest_slug, username, question_index, narrative,
-                problem_count=4, ui_page=1, dry_run=True):
+                problem_count=4, ui_page=1, dry_run=True,
+                contest_submission_id=None):
     """Full report flow for one submission. Returns the outcome string."""
     if dry_run:
         # Never touch the network in dry-run; the narrative is already persisted.
         return "dry_run"
     open_submission(session, contest_slug, username, question_index,
                     problem_count, ui_page)
-    return submit_report(session, narrative, dry_run=False)
+    outcome = submit_report(session, narrative, dry_run=False)
+    if contest_submission_id and not confirm_registered(session,
+                                                        contest_submission_id):
+        raise ReportError("submitted, but LeetCode does not show the report")
+    return outcome
