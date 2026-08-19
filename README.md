@@ -96,15 +96,32 @@ back to what was actually observed.
 
 ## Setup
 
+**1. Start the browser and sign in — once.**
+
+```
+start_chrome.bat
+```
+
+This opens an ordinary Chrome with a debugging port, using a profile in
+`data/chrome-profile/` that is separate from your everyday Chrome. Sign in to
+LeetCode in that window and leave it open.
+
+Signing in has to happen in a browser that Playwright did not launch. A
+Playwright-launched Chrome sets `navigator.webdriver` and carries automation
+flags, and LeetCode's sign-in verification refuses it. Attaching to a browser
+you started avoids the problem entirely: a real person signs in, in a real
+browser, and the tool just reuses that session.
+
+**2. Start the app.**
+
 ```
 run.bat
 ```
 
-First launch creates a venv, installs dependencies and Chromium, then opens
-`http://127.0.0.1:8000`. A Chrome window opens the first time you scan — **log
-in to LeetCode by hand once**. The session persists in `data/chrome-profile/`
-and is reused. (LeetCode sits behind Cloudflare and rejects unauthenticated
-HTTP, which is why this drives a real browser rather than using `requests`.)
+Creates a venv, installs dependencies, opens `http://127.0.0.1:8000`.
+
+(LeetCode sits behind Cloudflare and rejects unauthenticated HTTP, which is why
+this drives a browser at all rather than using `requests`.)
 
 ## Use
 
@@ -150,6 +167,7 @@ turning `dry_run` off.
 - `safety.dry_run` — compose and store reports without sending. **Default true.**
 - `safety.max_reports_per_contest`, `safety.min_seconds_between_reports`
 - `scope.rank_start` / `rank_end` / `questions` / `request_delay`
+- `browser.mode` — `attach` (default) or `launch`; see Setup
 - `detect.*` — thresholds above, plus `large_paste_chars`, `paste_ratio` and
   `idle_burst_seconds`
 

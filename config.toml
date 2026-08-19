@@ -44,9 +44,18 @@ inspect_all_replays = true
 
 
 [browser]
-# Persistent Chrome profile. Log in to LeetCode by hand once; the session is reused.
+# "attach" - connect to a Chrome you started with start_chrome.bat. Playwright
+#            never launches it, so it is an ordinary browser and LeetCode's
+#            sign-in verification treats it as one. Sign in there by hand.
+# "launch" - let Playwright start its own Chrome. Simpler, but it advertises
+#            itself as automated and sign-in verification tends to refuse it.
+mode = "attach"
+cdp_url = "http://127.0.0.1:9222"
+# Profile directory, used by start_chrome.bat and by launch mode. Kept separate
+# from your everyday Chrome profile.
 user_data_dir = "data/chrome-profile"
 headless = false
+
 
 [paths]
 database = "data/reporter.db"
