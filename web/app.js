@@ -98,13 +98,16 @@ async function refreshSetup() {
       action: st.browser_running && !st.signed_in_as
         ? { label: "Re-check", id: "recheck" } : null },
     { ok: !st.dry_run, title: "Live reporting", warn: true,
-      done: "On — scans will file reports",
+      done: "ON — every scan files reports to LeetCode",
       todo: "Off — reports are composed and stored, nothing is sent. " +
-            "Set safety.dry_run = false in config.toml to enable." },
+            "Set  dry_run = false  under [safety] in config.toml." },
   ];
 
   const ready = steps.slice(0, 3).every((s) => s.ok);
-  $("#setup").className = "setup" + (ready ? " ready" : "");
+  // Once live, the reporting row stays visible and loud: it is the one state
+  // where a scan does something irreversible.
+  $("#setup").className = "setup" + (ready ? " ready" : "") +
+                          (st.dry_run ? "" : " live");
   $("#setup").innerHTML =
     (ready ? "" : `<p class="setup-head">Before scanning</p>`) +
     steps.map((s) => `

@@ -121,3 +121,15 @@ tr.clickable:hover td { background: var(--hover); }
 .step button { padding: 5px 11px; font-size: 12.5px; }
 /* Once everything is ready the checklist collapses to a quiet single line. */
 .setup.ready .step.ok { display: none; }
+
+/* Live reporting is the one state where a scan is irreversible: keep it
+   visible even when the rest of the checklist has collapsed. */
+.setup.ready .step.off { display: flex; }
+.setup.live .step.off { display: none; }
+.setup.live .step:not(.off) { display: none; }
+.setup.live::before {
+  content: "LIVE REPORTING — scans will file reports to LeetCode";
+  display: block; padding: 9px 13px; border-radius: 8px;
+  background: #3a1416; border: 1px solid #6b2427; color: var(--danger);
+  font-size: 12px; font-weight: 650; letter-spacing: .03em;
+}
