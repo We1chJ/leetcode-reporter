@@ -25,9 +25,12 @@
       "leetcode_flag": false,
       "expect": "clean",
       "rows": [
-        "Input | 0:05 | size 40 chars", "Input | 0:15 | size 55 chars",
-        "Input | 0:30 | size 38 chars", "Input | 0:50 | size 61 chars",
-        "Input | 1:20 | size 44 chars", "Input | 2:05 | size 72 chars",
+        "Input | 0:05 | size 40 chars",
+        "Input | 0:15 | size 55 chars",
+        "Input | 0:30 | size 38 chars",
+        "Input | 0:50 | size 61 chars",
+        "Input | 1:20 | size 44 chars",
+        "Input | 2:05 | size 72 chars",
         "Run Code | 2:30 | Wrong Answer | Details",
         "Input | 3:10 | size 25 chars",
         "Submit Code | 3:40 | Accepted | Details"
@@ -43,8 +46,10 @@
       "expect": "clean",
       "rows": [
         "External Paste | 0:05 | size 300 chars",
-        "Input | 0:20 | size 60 chars", "Input | 0:40 | size 60 chars",
-        "Input | 1:05 | size 60 chars", "Input | 1:35 | size 60 chars",
+        "Input | 0:20 | size 60 chars",
+        "Input | 0:40 | size 60 chars",
+        "Input | 1:05 | size 60 chars",
+        "Input | 1:35 | size 60 chars",
         "Input | 2:10 | size 60 chars",
         "Submit Code | 2:40 | Accepted | Details"
       ]
@@ -58,8 +63,10 @@
       "leetcode_flag": false,
       "expect": "clean",
       "rows": [
-        "Input | 0:03 | size 45 chars", "Input | 0:12 | size 50 chars",
-        "Input | 0:25 | size 40 chars", "Input | 0:41 | size 35 chars",
+        "Input | 0:03 | size 45 chars",
+        "Input | 0:12 | size 50 chars",
+        "Input | 0:25 | size 40 chars",
+        "Input | 0:41 | size 35 chars",
         "Submit Code | 0:58 | Accepted | Details"
       ]
     },
@@ -77,6 +84,39 @@
         "Page Switch | 0:15 | Hidden",
         "External Paste | 0:31 | size > 500 chars | 🔴",
         "Submit Code | 0:36 | Accepted | Details"
+      ]
+    },
+    {
+      "label": "cheat: types a little, idles 3 minutes, then bursts in the solution",
+      "user": "idle-then-burst",
+      "question": "control-idle-burst",
+      "credit": 5,
+      "seconds_after_start": 800,
+      "leetcode_flag": false,
+      "expect": "cheat",
+      "rows": [
+        "Input | 0:05 | size 30 chars",
+        "Input | 0:12 | size 25 chars",
+        "External Paste | 3:20 | size > 500 chars | 🔴",
+        "Run Code | 3:26 | Accepted | Details",
+        "Submit Code | 3:31 | Accepted | Details"
+      ]
+    },
+    {
+      "label": "control: pauses to think, then keeps typing (no paste)",
+      "user": "thinker",
+      "question": "control-think-pause",
+      "credit": 5,
+      "seconds_after_start": 1100,
+      "leetcode_flag": false,
+      "expect": "clean",
+      "rows": [
+        "Input | 0:10 | size 40 chars",
+        "Input | 0:25 | size 35 chars",
+        "Input | 4:10 | size 55 chars",
+        "Input | 4:40 | size 60 chars",
+        "Input | 5:20 | size 45 chars",
+        "Submit Code | 6:00 | Accepted | Details"
       ]
     }
   ]

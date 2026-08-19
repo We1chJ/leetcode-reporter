@@ -30,8 +30,7 @@ app.mount("/static", StaticFiles(directory=config.ROOT / "web"), name="static")
 def get_config():
     cfg = config.load(reload=True)
     return {"safety": cfg["safety"], "scope": cfg["scope"],
-            "detect": cfg["detect"], "ai": cfg["ai"],
-            "running": _pipeline.running}
+            "detect": cfg["detect"], "running": _pipeline.running}
 
 
 @app.post("/api/scan/{contest_slug}")

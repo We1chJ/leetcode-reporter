@@ -47,14 +47,26 @@ A commented Java bitmask DP, in four events and eight seconds.
 
 | Reason code | Meaning | Score |
 |---|---|---|
-| `PASTE_NO_TYPING` | External pastes present, zero Input events | 0.99 |
-| `PASTE_DOMINANT` | Solution arrived almost entirely by paste | 0.95 |
+| `PASTE_NO_TYPING` | External pastes present, zero Input events | 1.00 |
+| `PASTE_DOMINANT` | Solution arrived almost entirely by paste | 0.97 |
+| `BURST_AFTER_IDLE` | Long inactivity, then a sudden large paste | 0.96 |
 | `LARGE_EXTERNAL_PASTE` | A single paste big enough to be the whole solution | 0.93 |
 | `PASTE_THEN_IMMEDIATE_SUBMIT` | Submitted seconds after the last paste | 0.90 |
 | `IMPLAUSIBLE_SOLVE_SPEED` | Fallback when no replay exists; never auto-reports | ≤ 0.90 |
 
 At or above `cheat_threshold` (0.95) a report is filed. Between `grey_low` and
-that, Claude adjudicates and can promote it.
+that, the submission is recorded and shown in the UI but never auto-reported.
+
+### Inactivity, then a burst
+
+Writing a solution in the editor produces continuous incremental typing. The
+cheating shape is the opposite: nothing, nothing, nothing, then the whole
+solution at once. `BURST_AFTER_IDLE` keys on exactly that — a paste at or above
+`large_paste_chars` preceded by at least `idle_burst_seconds` of no activity.
+
+Idle on its own is **not** a signal. A contestant who pauses four minutes to
+think and then keeps typing stays clean; there is a control case for this in the
+test suite. It is the idle *ending in a paste* that counts.
 
 ### It does not trust LeetCode's own flag
 
@@ -70,17 +82,17 @@ Solve speed is likewise only a fallback for submissions with no replay, and
 otherwise mild corroboration. A tight clean sweep is not a signal at all: at the
 top of any leaderboard everyone finishes fast.
 
-## What the AI does
+## Fully deterministic
 
-- **Writes the report narrative** — `claude-opus-5` turns the hard-coded reason
-  code plus measured evidence into the specific prose LeetCode's form requires.
-  Reason codes are constants; the model never invents one, and is instructed to
-  ground every sentence in the evidence.
-- **Adjudicates the grey zone** — returns a structured `{verdict, confidence,
-  rationale}`, defaulting to `not_violation` when ambiguous.
+There is no model anywhere in this tool. No API key, no network calls beyond
+LeetCode itself, no `anthropic` dependency. The same event history always
+produces the same verdict and the same report text, and every rule is readable
+in `core/detector.py`.
 
-Set `ai.enabled = false` to skip the API entirely and use deterministic
-templates.
+Report bodies are hard-coded templates in `core/report_text.py`, one per reason
+code, filled with numbers taken straight from the event history. Every sentence
+is either fixed text or a measured value, so any claim in a report can be traced
+back to what was actually observed.
 
 ## Setup
 
@@ -93,9 +105,6 @@ First launch creates a venv, installs dependencies and Chromium, then opens
 in to LeetCode by hand once**. The session persists in `data/chrome-profile/`
 and is reused. (LeetCode sits behind Cloudflare and rejects unauthenticated
 HTTP, which is why this drives a real browser rather than using `requests`.)
-
-For narrative generation, either export `ANTHROPIC_API_KEY` or run
-`ant auth login`.
 
 ## Use
 
@@ -120,14 +129,13 @@ turning `dry_run` off.
 - `safety.dry_run` — compose and store reports without sending. **Default true.**
 - `safety.max_reports_per_contest`, `safety.min_seconds_between_reports`
 - `scope.rank_start` / `rank_end` / `questions` / `request_delay`
-- `detect.*` — thresholds above, plus `large_paste_chars` and `paste_ratio`
-- `ai.model` / `ai.effort` / `ai.enabled`
+- `detect.*` — thresholds above, plus `large_paste_chars`, `paste_ratio` and
+  `idle_burst_seconds`
 
 ## Layout
 
 ```
-core/      browser, contest scraping, detection, reporting, pipeline
-ai/        narrative generation, grey-zone adjudication
+core/      browser, contest scraping, detection, report text, reporting, pipeline
 db/        SQLite schema and store
 web/       dashboard
 tools/     discovery spike, API findings, offline calibration

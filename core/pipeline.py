@@ -1,10 +1,12 @@
-"""Scan orchestration: leaderboard -> detect -> adjudicate -> report."""
+"""Scan orchestration: leaderboard -> replay -> detect -> report.
+
+Fully deterministic; no model is called anywhere in this path.
+"""
 
 import threading
 import time
 
-from ai import adjudicator, narrative
-from core import config, contest, detector, replay, reporter
+from core import config, contest, detector, replay, report_text, reporter
 from core.browser import Session
 from db import store
 
@@ -106,14 +108,13 @@ class Pipeline:
                             continue
 
                         if verdict == detector.GREY:
-                            ruling = adjudicator.adjudicate(evidence, ctx)
-                            evidence["adjudication"] = ruling
+                            # Recorded for review, never auto-reported.
+                            flagged += 1
+                            store.touch_offender(conn, username, contest_slug, False)
                             self.emit({"type": "log",
-                                       "msg": f"{username} {ctx['question_slug']}: grey "
-                                              f"({score}) -> {ruling['verdict']}"})
-                            if ruling["verdict"] != "violation":
-                                continue
-                            verdict = detector.CHEAT
+                                       "msg": f"{username} {ctx['question_slug']}: "
+                                              f"grey ({score}) {reason} - not reported"})
+                            continue
 
                         flagged += 1
                         store.touch_offender(conn, username, contest_slug, False)
@@ -131,8 +132,8 @@ class Pipeline:
                                               "already reported on LeetCode, skipping."})
                             continue
 
-                        text = narrative.generate(username, contest_slug,
-                                                  ctx["question_slug"], reason, evidence)
+                        text = report_text.generate(username, contest_slug,
+                                                    ctx["question_slug"], reason, evidence)
                         report_id = store.record_report(
                             conn, username=username, contest_slug=contest_slug,
                             question_slug=ctx["question_slug"], submission_id=sub_id,
