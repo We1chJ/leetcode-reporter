@@ -105,6 +105,10 @@ def _open_event_list(page):
 RANKING_URL = "https://leetcode.com/contest/{slug}/ranking/{page}?region=global_v2"
 
 
+def on_leetcode(page):
+    return "leetcode.com" in (page.url or "")
+
+
 def ensure_ranking_page(session, contest_slug, ui_page=1):
     """Open the ranking page holding a given block of 25 contestants.
 
@@ -113,7 +117,7 @@ def ensure_ranking_page(session, contest_slug, ui_page=1):
     """
     want = RANKING_URL.format(slug=contest_slug,
                               page="" if ui_page <= 1 else f"{ui_page}/")
-    if session.page.url.split("#")[0] != want:
+    if not on_leetcode(session.page) or session.page.url.split("#")[0] != want:
         session.page.goto(want, wait_until="domcontentloaded")
     # Wait for the grid itself, not for a <tr> that never exists.
     session.page.wait_for_selector('a[href^="/u/"]', timeout=20_000)
@@ -232,6 +236,18 @@ def events(session, contest_slug, username, question_index, problem_count=4,
     return None
 
 
+# Opening the replay of a LeetCode China account offers to send you to
+# leetcode.cn. Following it would navigate off leetcode.com mid-scan and break
+# every submission after it, so the offer is declined and the submission is
+# skipped. Distinct from an unreadable replay: there is nothing wrong here, the
+# data simply lives on another site.
+class ChinaAccountRedirect(RuntimeError):
+    pass
+
+
+CHINA_HINT = re.compile(r"LeetCode China|leetcode\.cn|力扣", re.I)
+STAY_BUTTON = re.compile(r"Return to Contest Page|Cancel|No, thanks", re.I)
+
 PROGRESSION_SAMPLES = 12
 SAMPLE_SETTLE_MS = 260
 
@@ -294,7 +310,28 @@ def _open_modal(session, contest_slug, username, question_index, problem_count,
             page.wait_for_timeout(1_000)
 
     page.wait_for_selector("text=Code Replay", timeout=timeout_ms)
+    _decline_china_redirect(page)
     return page
+
+
+def _decline_china_redirect(page):
+    """Dismiss the leetcode.cn offer without following it."""
+    dlg = page.locator("div[role='dialog']")
+    if not dlg.count():
+        return
+    try:
+        text = dlg.first.inner_text() or ""
+    except Exception:
+        return
+    if not CHINA_HINT.search(text):
+        return
+    stay = page.get_by_role("button", name=STAY_BUTTON)
+    if stay.count():
+        stay.first.click()
+    else:
+        page.keyboard.press("Escape")
+    raise ChinaAccountRedirect(
+        "replay is hosted on LeetCode China; skipped rather than followed")
 
 
 def _read_events(page):
@@ -372,6 +409,8 @@ def inspect(session, contest_slug, username, question_index, problem_count=4,
             _close(page)
             if prog or has_paste:
                 return {"events": evs or [], "progression": prog}
+        except ChinaAccountRedirect:
+            raise
         except Exception as exc:
             last_error = exc
         session.page.wait_for_timeout(700)

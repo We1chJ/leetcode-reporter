@@ -107,6 +107,10 @@ class Pipeline:
                                 if got:
                                     evs = got["events"]
                                     ctx_progression = got["progression"]
+                            except replay.ChinaAccountRedirect:
+                                self.emit({"type": "log",
+                                           "msg": f"{username} {qslug}: LeetCode "
+                                                  f"China account, skipped"})
                             except Exception as exc:
                                 self.emit({"type": "log", "level": "warn",
                                            "msg": f"{username} {qslug}: "

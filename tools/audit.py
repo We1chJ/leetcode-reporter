@@ -13,6 +13,7 @@ from core import config, contest, detector, replay
 from core.browser import Session
 
 MARK = {detector.CHEAT: "X", detector.GREY: "?", detector.CLEAN: "."}
+CN = "c"   # LeetCode China account: replay lives on another site, skipped
 
 
 def main():
@@ -47,6 +48,9 @@ def main():
                         rank=row["rank"],
                         finish_offset=(row["finish_time"] - meta["start_time"])
                         if row.get("finish_time") else None)
+                except replay.ChinaAccountRedirect:
+                    marks.append(CN)
+                    continue
                 except Exception:
                     got = None
                 if not got:
