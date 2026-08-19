@@ -75,7 +75,61 @@ const short = (v) => esc(String(v ?? "").replace(/_/g, " ").toLowerCase());
 const badge = (v) => `<span class="badge">${short(v)}</span>`;
 const when = (v) => esc(String(v ?? "").replace("T", " ").replace("+00:00", ""));
 
+// --- setup checklist -----------------------------------------------------
+async function refreshSetup() {
+  let st;
+  try { st = await (await fetch("/api/setup")).json(); }
+  catch { return; }
+
+  const steps = [
+    { ok: st.chrome_found, title: "Chrome installed",
+      done: "Found on this machine",
+      todo: "Chrome was not found in the usual locations" },
+    { ok: st.browser_running, title: "Browser running",
+      done: "Listening on the debugging port",
+      todo: "Not running — the scan cannot attach to anything",
+      action: st.chrome_found && !st.browser_running
+        ? { label: "Start browser", id: "start-browser" } : null },
+    { ok: !!st.signed_in_as, title: "Signed in to LeetCode",
+      done: `Signed in as ${st.signed_in_as || ""}`,
+      todo: st.browser_running
+        ? "Sign in yourself in the Chrome window that opened, then re-check"
+        : "Start the browser first",
+      action: st.browser_running && !st.signed_in_as
+        ? { label: "Re-check", id: "recheck" } : null },
+    { ok: !st.dry_run, title: "Live reporting", warn: true,
+      done: "On — scans will file reports",
+      todo: "Off — reports are composed and stored, nothing is sent. " +
+            "Set safety.dry_run = false in config.toml to enable." },
+  ];
+
+  const ready = steps.slice(0, 3).every((s) => s.ok);
+  $("#setup").className = "setup" + (ready ? " ready" : "");
+  $("#setup").innerHTML =
+    (ready ? "" : `<p class="setup-head">Before scanning</p>`) +
+    steps.map((s) => `
+      <div class="step ${s.ok ? "ok" : (s.warn ? "off" : "todo")}">
+        <span class="dot">${s.ok ? "✓" : (s.warn ? "○" : "!")}</span>
+        <span class="step-text">
+          <b>${esc(s.title)}</b>
+          <span class="dim">${esc(s.ok ? s.done : s.todo)}</span>
+        </span>
+        ${s.action ? `<button id="${s.action.id}">${esc(s.action.label)}</button>` : ""}
+      </div>`).join("");
+
+  const start = $("#start-browser");
+  if (start) start.onclick = async () => {
+    start.disabled = true; start.textContent = "Starting…";
+    await fetch("/api/browser/start", { method: "POST" });
+    line("Browser started. Sign in to LeetCode in that window.", "warn");
+    refreshSetup();
+  };
+  const recheck = $("#recheck");
+  if (recheck) recheck.onclick = () => { recheck.textContent = "Checking…"; refreshSetup(); };
+}
+
 async function refresh() {
+  refreshSetup();
   const cfg = await (await fetch("/api/config")).json();
   const dry = cfg.safety.dry_run;
   $("#mode").textContent = dry ? "dry run" : "live reporting";

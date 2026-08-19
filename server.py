@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from core import config, contest
+from core import chrome, config, contest
 from core.pipeline import Pipeline
 from db import store
 
@@ -56,6 +56,35 @@ def stats():
         return store.stats(conn)
     finally:
         conn.close()
+
+
+@app.get("/api/setup")
+def setup():
+    """Everything that must be true before a scan can run."""
+    st = chrome.status()
+    cfg = config.load(reload=True)
+    return {
+        "chrome_found": st["chrome_found"],
+        "browser_running": st["connected"],
+        "signed_in_as": _signed_in_as() if st["connected"] else None,
+        "dry_run": cfg["safety"]["dry_run"],
+        "profile": st.get("profile"),
+    }
+
+
+def _signed_in_as():
+    """Ask the running browser who is signed in. None if nobody."""
+    try:
+        from core.browser import Session
+        with Session() as s:
+            return s.whoami()
+    except Exception:
+        return None
+
+
+@app.post("/api/browser/start")
+def browser_start():
+    return chrome.start()
 
 
 @app.get("/api/by-user")

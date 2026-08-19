@@ -96,3 +96,28 @@ tr.clickable:hover td { background: var(--hover); }
 .drawer.open { transform: none; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between;
                gap: 12px; margin-bottom: 14px; }
+
+/* Setup checklist: what must be true before a scan can run. */
+.setup { padding: 16px 22px 0; display: flex; flex-direction: column; gap: 7px; }
+.setup.ready { padding-bottom: 0; }
+.setup-head { margin: 0 0 2px; font-size: 11px; color: var(--dim);
+              text-transform: uppercase; letter-spacing: .05em; }
+.step {
+  display: flex; align-items: center; gap: 11px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 13px;
+}
+.step .dot {
+  width: 19px; height: 19px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+}
+.step.ok   .dot { background: #14361f; color: var(--ok); }
+.step.todo .dot { background: #3a1416; color: var(--danger); }
+.step.off  .dot { background: #3a2a10; color: var(--accent); }
+.step-text { display: flex; gap: 9px; align-items: baseline; flex: 1;
+             flex-wrap: wrap; }
+.step-text b { font-weight: 600; font-size: 13px; }
+.step-text .dim { font-size: 12.5px; }
+.step button { padding: 5px 11px; font-size: 12.5px; }
+/* Once everything is ready the checklist collapses to a quiet single line. */
+.setup.ready .step.ok { display: none; }
