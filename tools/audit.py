@@ -58,8 +58,13 @@ def main():
                      "question_slug": q["title_slug"],
                      "progression": got["progression"]})
                 marks.append(MARK[v])
+                pastes = ev.get("paste_events")
                 if v == detector.CHEAT:
-                    notes.append(f"Q{i + 1} {reason} {sc} "
+                    notes.append(f"Q{i + 1} {reason} {sc} pastes={pastes}")
+                else:
+                    # Clean rows need their evidence shown too, otherwise a
+                    # "not cheating" call cannot be checked against anything.
+                    notes.append(f"Q{i + 1} clean pastes={pastes} "
                                  f"jump={ev.get('biggest_jump_fraction')} "
                                  f"steps={ev.get('growth_steps')}")
             line = " ".join(f"{m} " for m in marks)

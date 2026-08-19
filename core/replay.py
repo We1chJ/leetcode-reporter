@@ -142,18 +142,47 @@ def find_row(page, username, timeout_ms=15_000, rank=None, finish_offset=None):
     if rank is None or finish_offset is None:
         raise LookupError(f"{username}: no profile link and no rank to fall back on")
 
+    # Fall back to position. Two traps here, both hit on real data:
+    #  - The signed-in user's own row is pinned above the ranks, so indices are
+    #    shifted by one whenever it is present. Detect it, do not guess.
+    #  - Finish time alone does not identify a row. Ranks 211 and 212 of
+    #    weekly-contest-515 both finished at 00:27:53, and matching on time
+    #    attributed the first one's replay to the second.
     want = _hms(finish_offset)
     rows = page.locator(ROW_SELECTOR)
-    for i in range(rows.count()):
-        row = rows.nth(i)
-        cells = row.locator("> div")
-        if cells.count() < 4:
-            continue
-        # Third cell is Finish Time; matching it identifies the row unambiguously.
-        if (cells.nth(2).inner_text() or "").strip() == want:
-            return row
+    total = rows.count()
+    if not total:
+        raise LookupError(f"{username}: no rows on page")
+
+    def cells_of(i):
+        c = rows.nth(i).locator("> div")
+        return c if c.count() >= 4 else None
+
+    def finish_of(i):
+        c = cells_of(i)
+        return (c.nth(2).inner_text() or "").strip() if c else None
+
+    def name_of(i):
+        c = cells_of(i)
+        return (c.nth(0).inner_text() or "").strip() if c else ""
+
+    # The pinned row is the signed-in user's, labelled "You".
+    offset = 1 if total and name_of(0).splitlines()[0].strip() == "You" else 0
+    first_rank_on_page = ((rank - 1) // PAGE_SIZE) * PAGE_SIZE + 1
+    index = offset + (rank - first_rank_on_page)
+
+    if 0 <= index < total and finish_of(index) == want:
+        return rows.nth(index)
+
+    # Position did not line up. Only accept a time match if it is unique;
+    # never pick one of several rows sharing a finish time.
+    matches = [i for i in range(total) if finish_of(i) == want]
+    if len(matches) == 1:
+        return rows.nth(matches[0])
     raise LookupError(
-        f"{username}: no profile link, and no row with finish time {want}")
+        f"{username}: no profile link; row at index {index} did not match "
+        f"finish time {want} and {len(matches)} rows share it, so the row "
+        f"cannot be identified unambiguously")
 
 
 def problem_cell(row, question_index, problem_count):
