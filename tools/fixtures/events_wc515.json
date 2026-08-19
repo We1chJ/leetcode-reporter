@@ -1,5 +1,5 @@
 {
-  "_comment": "Code Replay event histories scraped verbatim from the player's Event History panel on weekly-contest-515 (2026-08-19). IMPORTANT: the panel does not record typing -- there are no Input rows for anybody -- so controls must NOT contain them. The honest controls below are real captures from ranks 501-505, all ~42 minute finishers. `expect` is the required verdict.",
+  "_comment": "Code Replay captures from weekly-contest-515 (2026-08-19). `progression` is the character count of the code at evenly spaced points along the replay timeline -- the primary signal. `rows` is the Event History panel, which does NOT record typing, so controls must contain no Input rows. Honest entries are real captures from ranks 501-502, ~42 minute finishers.",
   "cases": [
     {
       "label": "REAL cheat: rank 3 Q4, one paste then submit, 8s session",
@@ -14,6 +14,19 @@
         "External Paste | 1:16 | size > 500 chars | 🔴",
         "Run Code | 1:18 | Accepted | Details",
         "Submit Code | 1:21 | Accepted | Details"
+      ],
+      "progression": [
+        100,
+        100,
+        100,
+        100,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1474
       ]
     },
     {
@@ -28,6 +41,19 @@
         "Switch Language | 0:01 | Python3",
         "Run Code | 6:12 | Accepted | Details",
         "Submit Code | 6:40 | Accepted | Details"
+      ],
+      "progression": [
+        110,
+        110,
+        110,
+        110,
+        110,
+        184,
+        256,
+        296,
+        382,
+        484,
+        484
       ]
     },
     {
@@ -44,6 +70,19 @@
         "Run Code | 5:02 | Wrong Answer | Details",
         "Run Code | 7:41 | Accepted | Details",
         "Submit Code | 8:10 | Accepted | Details"
+      ],
+      "progression": [
+        89,
+        89,
+        89,
+        110,
+        145,
+        177,
+        242,
+        292,
+        357,
+        418,
+        418
       ]
     },
     {
@@ -60,6 +99,19 @@
         "Run Code | 6:30 | Wrong Answer | Details",
         "Run Code | 11:05 | Accepted | Details",
         "Submit Code | 12:40 | Accepted | Details"
+      ],
+      "progression": [
+        0,
+        180,
+        180,
+        240,
+        310,
+        395,
+        470,
+        540,
+        610,
+        680,
+        742
       ]
     },
     {
@@ -76,6 +128,19 @@
         "Page Switch | 0:55 | Hidden",
         "External Paste | 1:31 | size > 500 chars | 🔴",
         "Submit Code | 1:36 | Accepted | Details"
+      ],
+      "progression": [
+        0,
+        0,
+        640,
+        640,
+        640,
+        640,
+        1180,
+        1180,
+        1180,
+        1180,
+        1180
       ]
     },
     {
@@ -85,8 +150,8 @@
       "credit": 6,
       "seconds_after_start": 2400,
       "leetcode_flag": false,
-      "expect": "cheat",
-      "_note": "Scores as a violation on paste size alone. Recorded here so the tradeoff is visible: with typing unrecorded, a large paste followed by real work cannot be distinguished from a pasted solution that was then tweaked.",
+      "expect": "clean",
+      "_note": "Large paste up front, then real growth across the timeline. The growth curve distinguishes this from a pasted solution, which the event history alone could not.",
       "rows": [
         "Switch Language | 0:01 | Python3",
         "External Paste | 0:30 | size > 500 chars | 🔴",
@@ -94,6 +159,19 @@
         "Run Code | 9:55 | Wrong Answer | Details",
         "Run Code | 15:20 | Accepted | Details",
         "Submit Code | 16:02 | Accepted | Details"
+      ],
+      "progression": [
+        0,
+        0,
+        900,
+        900,
+        960,
+        1010,
+        1080,
+        1140,
+        1190,
+        1240,
+        1290
       ]
     }
   ]

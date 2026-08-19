@@ -32,7 +32,8 @@ def main():
         sub = {"date": c["seconds_after_start"], "lang": None,
                "fail_count": 0, "not_enough_activities": c["leetcode_flag"]}
         ctx = {"start_time": 0, "credit": c["credit"],
-               "question_slug": c["question"]}
+               "question_slug": c["question"],
+               "progression": c.get("progression")}
         verdict, score, reason, ev = detector.analyse(events, sub, ctx)
 
         expect = c["expect"]
@@ -46,6 +47,9 @@ def main():
 
         print(f"  [{mark}] {verdict:<5} {score:<5} {reason or '-'}")
         print(f"         {c['label']}")
+        print(f"         jump={ev.get('biggest_jump_fraction')} "
+              f"growth_steps={ev.get('growth_steps')} "
+              f"final={ev.get('final_chars')}ch")
         print(f"         pastes={ev.get('paste_events')} "
               f"largest={ev.get('largest_paste_chars')}ch "
               f"idle_before={ev.get('idle_before_largest_paste')}s "

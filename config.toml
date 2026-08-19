@@ -24,6 +24,19 @@ cheat_threshold = 0.95
 # Score at or above which a submission is recorded as suspicious and shown in
 # the UI, but never automatically reported.
 grey_low = 0.55
+# --- code growth, the primary signal ---
+# Fraction of the finished solution that may appear in a single step of the
+# replay timeline. Honest contestants sampled on weekly-contest-515 peaked at
+# 0.21; a pasted solution scores about 1.0.
+burst_fraction = 0.60
+# How many separate points in the timeline the code must grow at to count as
+# having been written progressively.
+min_growth_steps = 2
+# Ignore trivially short solutions, where one step is meaningless.
+min_solution_chars = 200
+# Points sampled along the replay timeline.
+progression_samples = 12
+
 # A single external paste of at least this many characters is decisive on its own.
 # LeetCode buckets large pastes as "size > 500 chars", so 500 is its coarsest step.
 large_paste_chars = 500

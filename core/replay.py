@@ -203,8 +203,35 @@ def events(session, contest_slug, username, question_index, problem_count=4,
     return None
 
 
-def _events_once(session, contest_slug, username, question_index, problem_count,
-                 ui_page, timeout_ms, rank=None, finish_offset=None):
+PROGRESSION_SAMPLES = 12
+SAMPLE_SETTLE_MS = 260
+
+# Total characters of code currently shown in the player (CodeMirror lines).
+JS_CODE_CHARS = ("() => [...document.querySelectorAll('.cm-line')]"
+                 ".reduce((n, l) => n + (l.innerText || '').length, 0)")
+
+# The scrub track: the widest thin element in the lower part of the modal.
+# It is a plain div -- no <input type=range>, no role="slider".
+JS_TRACK = """() => {
+    const d = document.querySelector('div[role="dialog"]');
+    if (!d) return null;
+    const dr = d.getBoundingClientRect();
+    let best = null;
+    d.querySelectorAll('*').forEach(e => {
+        const r = e.getBoundingClientRect();
+        if (r.width > dr.width * 0.6 && r.height > 0 && r.height <= 26 &&
+            r.top > dr.top + dr.height * 0.7) {
+            if (!best || r.width > best.w)
+                best = {x: r.x, y: r.y, w: r.width, h: r.height};
+        }
+    });
+    return best;
+}"""
+
+
+def _open_modal(session, contest_slug, username, question_index, problem_count,
+                ui_page, timeout_ms, rank=None, finish_offset=None):
+    """Open one submission's Code Replay modal. Returns the page, or None."""
     ensure_ranking_page(session, contest_slug, ui_page)
     page = session.page
     # A modal left open by the previous submission would swallow the next
@@ -232,16 +259,79 @@ def _events_once(session, contest_slug, username, question_index, problem_count,
             page.wait_for_timeout(1_000)
 
     page.wait_for_selector("text=Code Replay", timeout=timeout_ms)
-    _open_event_list(page)
+    return page
 
-    container = page.locator(EVENT_LIST).filter(
-        has_text=re.compile("Submit Code|Input|External Paste"))
-    if not container.count():
-        _close(page)
+
+def _read_events(page):
+    """The Event History rows, or None if the panel never rendered."""
+    if _wait_container(page, 2_000) is None:
+        _open_event_list(page)
+    container = _wait_container(page, 8_000)
+    if container is None:
         return None
-    rows = container.first.locator("> *").all_inner_texts()
+    return parse_rows(r.replace("\n", " | ")
+                      for r in container.first.locator("> *").all_inner_texts())
+
+
+def _read_progression(page, samples=PROGRESSION_SAMPLES):
+    """Scrub the timeline and measure how much code exists at each point.
+
+    This is the strongest signal the replay offers. Work done in the editor
+    grows the code gradually across the timeline; a solution brought in from
+    outside appears in a single step. Unlike the Event History, which does not
+    record typing at all, this reads the code itself at each point in time.
+    """
+    tr = page.evaluate(JS_TRACK)
+    if not tr or tr["w"] < 50:
+        return None
+    y = tr["y"] + tr["h"] / 2
+    out = []
+    for i in range(samples):
+        f = i / (samples - 1)
+        page.mouse.click(tr["x"] + 2 + f * (tr["w"] - 4), y)
+        page.wait_for_timeout(SAMPLE_SETTLE_MS)
+        out.append(page.evaluate(JS_CODE_CHARS))
+    return out
+
+
+def _events_once(session, contest_slug, username, question_index, problem_count,
+                 ui_page, timeout_ms, rank=None, finish_offset=None):
+    page = _open_modal(session, contest_slug, username, question_index,
+                       problem_count, ui_page, timeout_ms, rank, finish_offset)
+    if page is None:
+        return None
+    evs = _read_events(page)
     _close(page)
-    return parse_rows(r.replace("\n", " | ") for r in rows)
+    return evs
+
+
+def inspect(session, contest_slug, username, question_index, problem_count=4,
+            ui_page=1, timeout_ms=15_000, samples=PROGRESSION_SAMPLES,
+            attempts=2, rank=None, finish_offset=None):
+    """Open a submission once and read both its history and its growth curve.
+
+    Returns {"events": [...], "progression": [chars, ...]} or None. One modal
+    open per submission, since opening is the slow part.
+    """
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            page = _open_modal(session, contest_slug, username, question_index,
+                               problem_count, ui_page, timeout_ms, rank,
+                               finish_offset)
+            if page is None:
+                return None
+            evs = _read_events(page)
+            prog = _read_progression(page, samples)
+            _close(page)
+            if prog:
+                return {"events": evs or [], "progression": prog}
+        except Exception as exc:
+            last_error = exc
+        session.page.wait_for_timeout(700)
+    if last_error is not None:
+        raise last_error
+    return None
 
 
 def _close(page):

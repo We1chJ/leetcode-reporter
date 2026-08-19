@@ -32,6 +32,8 @@ from core import config
 from core.replay import PAGE_SWITCH, PASTE, RUN, SUBMIT
 
 # --- reason codes ---------------------------------------------------------
+CODE_APPEARS_IN_ONE_STEP = "CODE_APPEARS_IN_ONE_STEP"
+NO_INCREMENTAL_PROGRESS = "NO_INCREMENTAL_PROGRESS"
 LARGE_PASTE_THEN_SUBMIT = "LARGE_PASTE_THEN_SUBMIT"
 BURST_AFTER_IDLE = "BURST_AFTER_IDLE"
 LARGE_EXTERNAL_PASTE = "LARGE_EXTERNAL_PASTE"
@@ -41,6 +43,13 @@ IMPLAUSIBLE_SOLVE_SPEED = "IMPLAUSIBLE_SOLVE_SPEED"
 # Phrased strictly in terms of what the event history records. None of these may
 # assert anything about typing, which the history does not capture.
 REASON_TEXT = {
+    CODE_APPEARS_IN_ONE_STEP:
+        "stepping through the Code Replay shows the editor essentially empty "
+        "and then, in a single step of the timeline, holding the complete "
+        "solution -- the code never grew, it arrived all at once",
+    NO_INCREMENTAL_PROGRESS:
+        "stepping through the Code Replay shows no gradual growth of the "
+        "solution across the recording; the code is static and then complete",
     LARGE_PASTE_THEN_SUBMIT:
         "a large block of code arrived in a single external paste and was "
         "submitted within seconds, leaving no time to read, adapt or test it",
@@ -62,6 +71,29 @@ CLEAN, GREY, CHEAT = "clean", "grey", "cheat"
 # Fastest plausible accepted solve, in seconds from contest start, by credit.
 # Deliberately generous -- floors that strong contestants stay above.
 SPEED_FLOOR = {3: 45, 4: 90, 5: 180, 6: 300}
+
+
+def summarise_progression(prog):
+    """Describe how the code grew across the timeline.
+
+    `prog` is the character count of the code at evenly spaced points through
+    the replay. Work done in the editor climbs steadily; a solution brought in
+    from outside jumps from nothing to complete in one step.
+    """
+    final = max(prog) if prog else 0
+    steps = [prog[i + 1] - prog[i] for i in range(len(prog) - 1)]
+    growth = [d for d in steps if d > 0]
+    biggest = max(steps) if steps else 0
+    return {
+        "samples": len(prog),
+        "final_chars": final,
+        "biggest_single_jump_chars": biggest,
+        # The headline number: how much of the finished solution appeared in
+        # one step of the timeline. Near 1.0 means it was never written here.
+        "biggest_jump_fraction": round(biggest / final, 3) if final else 0.0,
+        "growth_steps": len(growth),
+        "curve": prog,
+    }
 
 
 def summarise(events):
@@ -127,7 +159,24 @@ def analyse(events, sub, ctx):
 
     reasons = []
 
-    if events:
+    # The growth curve is authoritative when we have it. Code that keeps
+    # growing across the timeline was being worked on, whatever else happened:
+    # someone may well paste their own template or library and then write the
+    # solution around it, and that must not be reported.
+    authored = False
+    prog = ctx.get("progression")
+    if prog:
+        g = summarise_progression(prog)
+        evidence.update(g)
+        authored = g["growth_steps"] > d["min_growth_steps"]
+        evidence["shows_ongoing_authoring"] = authored
+        if g["final_chars"] >= d["min_solution_chars"] and not authored:
+            if g["biggest_jump_fraction"] >= d["burst_fraction"]:
+                reasons.append((CODE_APPEARS_IN_ONE_STEP, 0.98))
+            else:
+                reasons.append((NO_INCREMENTAL_PROGRESS, 0.94))
+
+    if events and not authored:
         s = summarise(events)
         evidence.update(s)
         big = s["largest_paste_chars"] >= d["large_paste_chars"]

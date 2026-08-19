@@ -47,7 +47,37 @@ def _no_run(e):
     return " The code was never run between the paste and the submission."
 
 
+def _curve(e):
+    c = e.get("curve") or []
+    if not c:
+        return ""
+    return (" Sampling the replay timeline at " + str(len(c)) +
+            " evenly spaced points, the amount of code present was: " +
+            ", ".join(str(n) for n in c) + " characters.")
+
+
 BODIES = {
+    D.CODE_APPEARS_IN_ONE_STEP: lambda e: (
+        f" Stepping through LeetCode's Code Replay for this submission shows "
+        f"the solution appearing all at once rather than being written. "
+        f"{e.get('biggest_single_jump_chars', 0)} characters - "
+        f"{round(100 * e.get('biggest_jump_fraction', 0))}% of the finished "
+        f"{e.get('final_chars', 0)}-character solution - appear in a single "
+        f"step of the timeline, and the code grows at only "
+        f"{e.get('growth_steps', 0)} point(s) in the whole recording."
+        + _curve(e) +
+        " Code written in the editor grows steadily across the replay. This "
+        "did not; it was complete the moment it appeared."),
+
+    D.NO_INCREMENTAL_PROGRESS: lambda e: (
+        f" Stepping through LeetCode's Code Replay for this submission shows no "
+        f"gradual progress: across {e.get('samples', 0)} evenly spaced points "
+        f"in the recording the code grows at only {e.get('growth_steps', 0)} "
+        f"of them, ending at {e.get('final_chars', 0)} characters."
+        + _curve(e) +
+        " Writing a solution in the editor produces continuous growth across "
+        "the recording."),
+
     D.LARGE_PASTE_THEN_SUBMIT: lambda e: (
         f" LeetCode's Code Replay records an external paste of {_size(e)} at "
         f"{e.get('last_paste_t', 0)} seconds into the editing session, and the "

@@ -88,22 +88,28 @@ class Pipeline:
                         ctx = {"start_time": meta["start_time"],
                                "credit": credit.get(qid),
                                "question_slug": slug_of.get(qid, qid),
-                               "sweep_span": sweep}
+                               "sweep_span": sweep,
+                               "progression": ctx_progression}
 
                         # Read the Code Replay event history. This is the whole
                         # basis of the judgment, so a scrape failure must not be
                         # silently treated as "nothing to see".
                         evs = None
+                        ctx_progression = None
                         if sub.get("has_replay"):
                             try:
-                                evs = replay.events(
+                                got = replay.inspect(
                                     session, contest_slug, username,
                                     index_of[qid], problem_count=len(qs),
                                     ui_page=(row["rank"] - 1) // 25 + 1,
+                                    samples=cfg["detect"]["progression_samples"],
                                     rank=row["rank"],
                                     finish_offset=(row["finish_time"] -
                                                    meta["start_time"])
                                     if row.get("finish_time") else None)
+                                if got:
+                                    evs = got["events"]
+                                    ctx_progression = got["progression"]
                             except Exception as exc:
                                 self.emit({"type": "log", "level": "warn",
                                            "msg": f"{username} {ctx['question_slug']}: "
