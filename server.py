@@ -58,6 +58,15 @@ def stats():
         conn.close()
 
 
+@app.get("/api/by-user")
+def by_user():
+    conn = store.connect()
+    try:
+        return store.by_user(conn)
+    finally:
+        conn.close()
+
+
 @app.get("/api/reports")
 def reports():
     conn = store.connect()

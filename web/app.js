@@ -1,9 +1,11 @@
 const $ = (s) => document.querySelector(s);
 const logbody = $("#logbody");
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function line(text, cls = "") {
   const t = new Date().toLocaleTimeString();
-  logbody.innerHTML += `<span class="dim">${t}</span> <span class="${cls}">${text}</span>\n`;
+  logbody.innerHTML += `<span class="dim">${t}</span> <span class="${cls}">${esc(text)}</span>\n`;
   logbody.parentElement.scrollTop = 1e9;
 }
 
@@ -11,11 +13,16 @@ function line(text, cls = "") {
 const es = new EventSource("/api/stream");
 es.onmessage = (m) => {
   const ev = JSON.parse(m.data);
-  if (ev.type === "log") line(ev.msg, ev.level === "warn" ? "warn" : ev.level === "error" ? "error" : "");
-  else if (ev.type === "progress") $("#status").textContent = `rank ${ev.rank} — ${ev.user}`;
-  else if (ev.type === "scan_start") line(`Scan started: ${ev.contest}${ev.dry_run ? " (dry run)" : ""}`, "warn");
-  else if (ev.type === "report") line(`REPORT ${ev.user} / ${ev.question} — ${ev.reason} (${ev.score}) → ${ev.outcome}`, "good");
-  else if (ev.type === "scan_end") {
+  if (ev.type === "log")
+    line(ev.msg, ev.level === "warn" ? "warn" : ev.level === "error" ? "error" : "");
+  else if (ev.type === "progress")
+    $("#status").textContent = `rank ${ev.rank} — ${ev.user}`;
+  else if (ev.type === "scan_start")
+    line(`Scan started: ${ev.contest}${ev.dry_run ? " (dry run)" : ""}`, "warn");
+  else if (ev.type === "report") {
+    line(`REPORT ${ev.user} / ${ev.question} — ${ev.reason} (${ev.score}) → ${ev.outcome}`, "good");
+    refresh();
+  } else if (ev.type === "scan_end") {
     line(`Scan ${ev.status}: ${ev.scanned} scanned, ${ev.flagged} flagged, ${ev.reported} reported`, "warn");
     $("#status").textContent = "";
     refresh();
@@ -40,15 +47,33 @@ document.querySelectorAll(".tab").forEach((t) => {
   };
 });
 
-// --- tables --------------------------------------------------------------
-function table(rows, cols) {
+// --- report drawer -------------------------------------------------------
+let reportsCache = [];
+$("#drawer-close").onclick = () => $("#drawer").classList.remove("open");
+function openReport(id) {
+  const r = reportsCache.find((x) => String(x.id) === String(id));
+  if (!r) return;
+  $("#drawer-title").textContent = `${r.username} — ${r.question_slug}`;
+  $("#drawer-body").textContent = r.narrative;
+  $("#drawer").classList.add("open");
+}
+
+// --- rendering -----------------------------------------------------------
+function table(rows, cols, opts = {}) {
   if (!rows.length) return `<p class="dim">Nothing yet.</p>`;
   const head = cols.map(([, label]) => `<th>${label}</th>`).join("");
-  const body = rows.map((r) =>
-    `<tr>${cols.map(([k, , cls]) => `<td class="${cls || ""}">${r[k] ?? ""}</td>`).join("")}</tr>`
-  ).join("");
+  const body = rows.map((r) => {
+    const attr = opts.rowId ? ` data-id="${esc(r[opts.rowId])}" class="clickable"` : "";
+    const tds = cols.map(([k, , fmt]) =>
+      `<td>${fmt ? fmt(r[k], r) : esc(r[k])}</td>`).join("");
+    return `<tr${attr}>${tds}</tr>`;
+  }).join("");
   return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
+
+const short = (v) => esc(String(v ?? "").replace(/_/g, " ").toLowerCase());
+const badge = (v) => `<span class="badge">${short(v)}</span>`;
+const when = (v) => esc(String(v ?? "").replace("T", " ").replace("+00:00", ""));
 
 async function refresh() {
   const cfg = await (await fetch("/api/config")).json();
@@ -58,24 +83,51 @@ async function refresh() {
 
   const st = await (await fetch("/api/stats")).json();
   $("#stats").innerHTML = [
-    ["Cheating submissions caught", st.cheating_submissions_caught, "big"],
-    ["Reports submitted", st.reports_submitted],
-    ["Suspicious, not reported", st.suspicious_recorded],
+    ["Caught", st.cheating_submissions_caught, "big"],
+    ["Reports sent", st.reports_submitted, dry ? "muted" : ""],
+    ["Suspicious", st.suspicious_recorded],
     ["Submissions scanned", st.submissions_scanned],
     ["Contests scanned", st.contests_scanned],
   ].map(([label, value, cls]) =>
     `<div class="stat ${cls || ""}"><span class="n">${value ?? 0}</span>` +
     `<span class="l">${label}</span></div>`).join("");
-  $("#reports").innerHTML = table(await (await fetch("/api/reports")).json(), [
-    ["username", "User"], ["contest_slug", "Contest"],
-    ["question_slug", "Problem"], ["reason_code", "Reason"],
-    ["score", "Score"], ["outcome", "Outcome"],
-    ["narrative", "Narrative", "narrative"],
-  ]);
+
+  // Contestants: one row per username, the view you actually read.
+  const users = await (await fetch("/api/by-user")).json();
+  $("#users").innerHTML =
+    `<p class="dim note">${users.length} contestant(s) with at least one report. ` +
+    `Grouping is for display only — no verdict uses a contestant's past.</p>` +
+    table(users, [
+      ["username", "Contestant", (v) => `<a href="https://leetcode.com/u/${encodeURIComponent(v)}/" target="_blank" rel="noopener">${esc(v)}</a>`],
+      ["submissions", "Caught"],
+      ["contests", "Contests"],
+      ["sent", "Sent"],
+      ["reasons", "Reasons", (v) => String(v || "").split(",").map(badge).join(" ")],
+      ["last_seen", "Last", when],
+    ]);
+
+  reportsCache = await (await fetch("/api/reports")).json();
+  $("#reports").innerHTML =
+    `<p class="dim note">Click a row to read the exact report text.</p>` +
+    table(reportsCache, [
+      ["username", "Contestant"],
+      ["question_slug", "Problem", (v) => esc(String(v).slice(0, 34))],
+      ["reason_code", "Reason", badge],
+      ["score", "Score"],
+      ["outcome", "Outcome", badge],
+      ["created_at", "When", when],
+    ], { rowId: "id" });
+  $("#reports").querySelectorAll("tr.clickable").forEach((tr) => {
+    tr.onclick = () => openReport(tr.dataset.id);
+  });
+
   $("#scans").innerHTML = table(await (await fetch("/api/scans")).json(), [
-    ["contest_slug", "Contest"], ["started_at", "Started"],
-    ["ranks_scanned", "Scanned"], ["flagged", "Flagged"],
-    ["reported", "Reported"], ["status", "Status"],
+    ["contest_slug", "Contest"],
+    ["started_at", "Started", when],
+    ["ranks_scanned", "Scanned"],
+    ["flagged", "Flagged"],
+    ["reported", "Reported"],
+    ["status", "Status", badge],
   ]);
 }
 

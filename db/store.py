@@ -64,6 +64,26 @@ def reports(conn, limit=200):
     return [dict(r) for r in rows]
 
 
+def by_user(conn):
+    """Reports grouped by contestant, for display only.
+
+    This is a view over what was filed, not a profile used in judging: no
+    verdict ever consults a contestant's past.
+    """
+    rows = conn.execute(
+        "SELECT username,"
+        "       COUNT(*) AS submissions,"
+        "       COUNT(DISTINCT contest_slug) AS contests,"
+        "       GROUP_CONCAT(DISTINCT reason_code) AS reasons,"
+        "       MAX(score) AS top_score,"
+        "       SUM(CASE WHEN outcome='submitted' THEN 1 ELSE 0 END) AS sent,"
+        "       MAX(created_at) AS last_seen "
+        "FROM reports GROUP BY username "
+        "ORDER BY submissions DESC, last_seen DESC"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 # --- lifetime counters ------------------------------------------------
 
 # Totals across every scan ever run, not per user and not per contest.

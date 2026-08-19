@@ -9,31 +9,43 @@
 </head>
 <body>
 <header>
-  <img src="/static/logo.svg" alt="" width="26" height="26">
+  <img src="/static/logo.svg" alt="" width="28" height="28">
   <h1>Contest Reporter</h1>
   <span id="mode" class="pill">…</span>
+  <span class="spacer"></span>
+  <span id="status" class="dim"></span>
 </header>
 
 <section class="stats" id="stats"></section>
 
 <section class="controls">
-  <input id="slug" placeholder="weekly-contest-450" autocomplete="off">
-  <button id="scan">Scan contest</button>
+  <input id="slug" placeholder="weekly-contest-515" autocomplete="off">
+  <button id="scan" class="primary">Scan contest</button>
   <button id="stop" class="danger">Stop</button>
-  <span id="status"></span>
 </section>
 
 <nav class="tabs">
-  <button class="tab active" data-tab="log">Live log</button>
+  <button class="tab active" data-tab="users">Contestants</button>
   <button class="tab" data-tab="reports">Reports</button>
   <button class="tab" data-tab="scans">Scans</button>
+  <button class="tab" data-tab="log">Live log</button>
 </nav>
 
 <main>
-  <div id="log" class="panel active"><pre id="logbody"></pre></div>
+  <div id="users" class="panel active"></div>
   <div id="reports" class="panel"></div>
   <div id="scans" class="panel"></div>
+  <div id="log" class="panel"><pre id="logbody"></pre></div>
 </main>
+
+<!-- Full report text, opened from a row in the Reports tab. -->
+<div id="drawer" class="drawer">
+  <div class="drawer-head">
+    <strong id="drawer-title"></strong>
+    <button id="drawer-close">Close</button>
+  </div>
+  <pre id="drawer-body"></pre>
+</div>
 
 <script src="/static/app.js"></script>
 </body>
