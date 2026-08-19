@@ -23,7 +23,7 @@ class Pipeline:
 
     def scan(self, contest_slug):
         cfg = config.load(reload=True)
-        safety, scope, det = cfg["safety"], cfg["scope"], cfg["detect"]
+        safety, scope = cfg["safety"], cfg["scope"]
         dry_run = safety["dry_run"]
 
         self.running = True
@@ -70,6 +70,8 @@ class Pipeline:
                     dates = [s["date"] for s in row["submissions"].values() if s.get("date")]
                     sweep = (max(dates) - min(dates)
                              if len(dates) == len(qs) and len(qs) > 1 else None)
+                    # Context for the report only; a tight sweep is normal at the
+                    # top of a leaderboard and never scores on its own.
 
                     for qid, sub in row["submissions"].items():
                         if self._stop.is_set():
@@ -84,15 +86,24 @@ class Pipeline:
                                "credit": credit.get(qid),
                                "question_slug": slug_of.get(qid, qid),
                                "sweep_span": sweep}
-                        verdict, score, reason, evidence = detector.analyse(sub, ctx)
+
+                        # Read the Code Replay event history. This is the whole
+                        # basis of the judgment, so a scrape failure must not be
+                        # silently treated as "nothing to see".
+                        evs = None
+                        if sub.get("has_replay"):
+                            try:
+                                evs = replay.events(session, contest_slug,
+                                                    username, index_of[qid])
+                            except Exception as exc:
+                                self.emit({"type": "log", "level": "warn",
+                                           "msg": f"{username} {ctx['question_slug']}: "
+                                                  f"replay unreadable ({exc})"})
+
+                        verdict, score, reason, evidence = detector.analyse(evs, sub, ctx)
 
                         if verdict == detector.CLEAN:
                             continue
-
-                        # Never report on speed alone unless explicitly allowed.
-                        if det["require_leetcode_flag"] and not sub.get("not_enough_activities"):
-                            if verdict == detector.CHEAT:
-                                verdict = detector.GREY
 
                         if verdict == detector.GREY:
                             ruling = adjudicator.adjudicate(evidence, ctx)

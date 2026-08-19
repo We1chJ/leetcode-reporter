@@ -93,13 +93,31 @@ shape for filing a report was deliberately NOT probed** — sending one would fi
 a real report against a real person. Confirm it by opening the dialog once by
 hand with the network tab open.
 
-## Code Replay events — not separately fetchable
+## Code Replay events — no API, but scrapable from the player
 
 Opening the Code Replay modal fires only two LeetCode calls:
 `/api/submissions/{submission_id}/` and
 `/contest/api/reports/submissions/{id}/`. There is **no** request carrying
 keystroke events, and no `replay`-named GraphQL operation in the loaded chunks.
 
-So per-event replay data is not available over a simple API call. This is why
-`not_enough_activities` is the primary detection signal rather than
-reconstructed keystrokes: LeetCode already computed the answer and exposes it.
+So there is no API for the events. **But the player renders them.** Its
+"Event History" panel (the list icon in the player footer, i18n key
+`toggleEventList`) lists every recorded event, and the DOM is scrapable:
+
+- container: `div.flex.flex-1.flex-col.overflow-y-auto` inside the modal
+- one child element per event
+- row text: `Type | m:ss | detail` — e.g. `External Paste | 0:06 | size > 500 chars | 🔴`
+
+Event vocabulary, from the i18n bundle key `recordEventType`:
+
+```
+start, switchQuestion, switchLang, pageVisible ("Page Switch"),
+interpretCode ("Run Code"), submitCode, end, input, undo, redo,
+paste ("External Paste"), changeCursor, debug, debugEnd
+```
+
+Paste sizes are bucketed (`size > 500 chars`), so treat a size as a lower bound.
+
+This is the detection basis — our own reading of the events — rather than
+LeetCode's `not_enough_activities` flag, which misses cases whose own replay
+shows a single external paste and no typing.

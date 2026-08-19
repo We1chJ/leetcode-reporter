@@ -1,60 +1,66 @@
-"""Run the detector over a captured contest fixture and print the verdicts.
+"""Run the detector over captured Code Replay event histories and check verdicts.
 
-Offline: no LeetCode access needed. Use this to sanity-check thresholds before
-turning dry_run off.
+Offline: no LeetCode access needed. Run this after touching thresholds or
+scoring rules, and before ever turning dry_run off.
 
-    python -m tools.calibrate tools/fixtures/wc515_top11.json
+    python -m tools.calibrate
+
+A false positive here means the tool would file a report against someone who did
+nothing wrong, so any control case landing on `cheat` is a hard failure.
 """
 
 import json
 import sys
-from collections import Counter
 from pathlib import Path
 
 from core import config, detector
+from core.replay import parse_rows
 
-START = None
+DEFAULT = "tools/fixtures/events_wc515.json"
 
 
 def main():
-    path = Path(sys.argv[1] if len(sys.argv) > 1
-                else "tools/fixtures/wc515_top11.json")
-    fx = json.loads(path.read_text())
-    slug_of = {q["question_id"]: q["title_slug"] for q in fx["questions"]}
-    start = fx["start_time"]
+    path = Path(sys.argv[1] if len(sys.argv) > 1 else DEFAULT)
+    fx = json.loads(path.read_text(encoding="utf-8"))
     d = config.load()["detect"]
+    print(f"cheat>={d['cheat_threshold']}  grey>={d['grey_low']}  "
+          f"large_paste>={d['large_paste_chars']} chars\n")
 
-    print(f"{fx['slug']}  cheat>={d['cheat_threshold']}  grey>={d['grey_low']}  "
-          f"require_leetcode_flag={d['require_leetcode_flag']}\n")
+    failures = []
+    for c in fx["cases"]:
+        events = parse_rows(c["rows"])
+        sub = {"date": c["seconds_after_start"], "lang": None,
+               "fail_count": 0, "not_enough_activities": c["leetcode_flag"]}
+        ctx = {"start_time": 0, "credit": c["credit"],
+               "question_slug": c["question"]}
+        verdict, score, reason, ev = detector.analyse(events, sub, ctx)
 
-    tally = Counter()
-    for rank, user, subs in fx["rows"]:
-        offsets = [s[1] for s in subs]
-        sweep = max(offsets) - min(offsets) if len(subs) > 1 else None
-        lines = []
-        for qid, offset, credit, flag, fails in subs:
-            sub = {"date": start + offset, "not_enough_activities": bool(flag),
-                   "fail_count": fails, "lang": "python3", "has_replay": True}
-            ctx = {"start_time": start, "credit": credit,
-                   "question_slug": slug_of[qid], "sweep_span": sweep}
-            verdict, score, reason, _ = detector.analyse(sub, ctx)
+        expect = c["expect"]
+        # grey never auto-reports, so treating a clean control as grey is a
+        # softer miss than reporting it -- but a reported control is fatal.
+        ok = verdict == expect or (expect == "clean" and verdict == "grey")
+        fatal = expect == "clean" and verdict == "cheat"
+        mark = "ok  " if ok else ("FAIL" if fatal else "warn")
+        if not ok:
+            failures.append((c["label"], verdict, expect, fatal))
 
-            # Mirror the pipeline's guard: speed alone never auto-reports.
-            if d["require_leetcode_flag"] and not flag and verdict == detector.CHEAT:
-                verdict = detector.GREY
+        print(f"  [{mark}] {verdict:<5} {score:<5} {reason or '-'}")
+        print(f"         {c['label']}")
+        print(f"         typed={ev.get('typed_chars')} pasted={ev.get('pasted_chars')} "
+              f"inputs={ev.get('input_events')} pastes={ev.get('paste_events')} "
+              f"lc_flag={ev.get('leetcode_insufficient_activity')}")
 
-            tally[verdict] += 1
-            if verdict != detector.CLEAN:
-                lines.append(f"      Q{credit}p {offset:>4}s "
-                             f"{'LC-FLAG' if flag else '       '} "
-                             f"{verdict:<5} {score:<5} {reason}")
-        if lines:
-            print(f"  #{rank:<3} {user}  (sweep {sweep}s)")
-            print("\n".join(lines))
-
-    print(f"\n  {dict(tally)}")
-    print("  cheat -> auto-reported; grey -> sent to Claude to adjudicate")
+    fatal = [f for f in failures if f[3]]
+    print()
+    if fatal:
+        print(f"  {len(fatal)} FALSE POSITIVE(S) - do not disable dry_run")
+        return 1
+    if failures:
+        print(f"  {len(failures)} soft mismatch(es), no false positives")
+    else:
+        print("  all cases as expected")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

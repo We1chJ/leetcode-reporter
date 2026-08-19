@@ -23,13 +23,20 @@ request_delay = 1.0
 cheat_threshold = 0.95
 # Score at or above which an ambiguous submission is sent to Claude to adjudicate.
 grey_low = 0.55
-# Solving every problem within this many seconds of each other. Corroborates
-# LeetCode's flag; never reports on its own (see core/detector.py).
-sweep_span_seconds = 120
-# Require LeetCode's own not_enough_activities flag before reporting at all.
-# Leaving this true means speed alone never files a report; it can only
-# corroborate LeetCode's flag or route a case to the model for adjudication.
-require_leetcode_flag = true
+# A single external paste of at least this many characters is decisive on its own.
+# LeetCode buckets large pastes as "size > 500 chars", so 500 is its coarsest step.
+large_paste_chars = 500
+# Typed characters must exceed (1 - paste_ratio) x pasted characters to count as
+# real authoring rather than incidental edits around a paste.
+paste_ratio = 0.95
+# Seconds between the last external paste and submission for
+# PASTE_THEN_IMMEDIATE_SUBMIT.
+instant_submit_seconds = 20
+# Open the Code Replay for every submission in scope. Slower (one modal each),
+# but it is the only way to see the event history. When false, only submissions
+# that already look fast are opened.
+inspect_all_replays = true
+
 
 [ai]
 model = "claude-opus-5"
