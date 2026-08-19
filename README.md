@@ -138,9 +138,13 @@ tools/     discovery spike, API findings, offline calibration
 Detection, scoring, storage, the dashboard and dry-run reporting work, and the
 detector is checked against a real captured event history plus controls.
 
-The Event History **scraper** (`core/replay.py`) is written against the DOM
-structure confirmed live, but has not yet run under Playwright end-to-end — the
-parser is tested on real scraped rows, the browser driving around it is not. The one piece **not** verified end-to-end is the
-actual report submission: the POST shape was deliberately not probed, because
-probing it means filing a real report against a real person. Confirm the
-selectors in `core/reporter.py` against the live dialog once before going live.
+Two pieces are **not** verified end-to-end:
+
+1. **The Event History scraper** (`core/replay.py`) is written against the DOM
+   structure confirmed live, but has not yet run under Playwright. The parser is
+   tested on real scraped rows; the browser driving around it is not.
+2. **Report submission.** The POST shape was deliberately not probed, because
+   probing it means filing a real report against a real person. Confirm the
+   selectors in `core/reporter.py` against the live dialog once before going live.
+
+Both are exercised safely by a dry-run scan, which does everything except send.
