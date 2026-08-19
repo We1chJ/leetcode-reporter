@@ -99,7 +99,11 @@ class Pipeline:
                                 evs = replay.events(
                                     session, contest_slug, username,
                                     index_of[qid], problem_count=len(qs),
-                                    ui_page=(row["rank"] - 1) // 25 + 1)
+                                    ui_page=(row["rank"] - 1) // 25 + 1,
+                                    rank=row["rank"],
+                                    finish_offset=(row["finish_time"] -
+                                                   meta["start_time"])
+                                    if row.get("finish_time") else None)
                             except Exception as exc:
                                 self.emit({"type": "log", "level": "warn",
                                            "msg": f"{username} {ctx['question_slug']}: "

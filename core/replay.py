@@ -31,6 +31,10 @@ EVENT_LIST = "div.flex.flex-1.flex-col.overflow-y-auto"
 # per-problem cells (the rank number lives outside the row, in a sticky column).
 ROW_FROM_LINK = ('xpath=ancestor::div[contains(@class,"h-[50px]")'
                  ' and contains(@class,"w-full")][1]')
+# Same container, addressed directly. Attribute-substring matching avoids having
+# to escape Tailwind's square brackets in a CSS class selector.
+ROW_SELECTOR = 'div[class*="h-[50px]"][class*="w-full"]'
+PAGE_SIZE = 25
 
 INPUT = "Input"
 PASTE = "External Paste"
@@ -114,11 +118,41 @@ def ensure_ranking_page(session, contest_slug, ui_page=1):
     session.page.wait_for_selector('a[href^="/u/"]', timeout=20_000)
 
 
-def find_row(page, username, timeout_ms=15_000):
-    """The row container for one contestant, located via their profile link."""
-    link = page.locator(f'a[href="/u/{username}/"]').first
-    link.wait_for(timeout=timeout_ms)
-    return link.locator(ROW_FROM_LINK)
+def _hms(seconds):
+    h, rem = divmod(int(seconds), 3600)
+    return f"{h:02d}:{rem // 60:02d}:{rem % 60:02d}"
+
+
+def find_row(page, username, timeout_ms=15_000, rank=None, finish_offset=None):
+    """The row container for one contestant.
+
+    Normally located by their profile link. But not every contestant has one:
+    weekly-contest-515 renders 24 profile links across 25 rows, because some
+    accounts show their name as plain text. For those, fall back to the row's
+    position on the page -- and verify it by finish time, so an off-by-one
+    (the signed-in user's own row is pinned above rank 1) can never quietly
+    attribute a replay to the wrong person.
+    """
+    link = page.locator(f'a[href="/u/{username}/"]')
+    if link.count():
+        link.first.wait_for(timeout=timeout_ms)
+        return link.first.locator(ROW_FROM_LINK)
+
+    if rank is None or finish_offset is None:
+        raise LookupError(f"{username}: no profile link and no rank to fall back on")
+
+    want = _hms(finish_offset)
+    rows = page.locator(ROW_SELECTOR)
+    for i in range(rows.count()):
+        row = rows.nth(i)
+        cells = row.locator("> div")
+        if cells.count() < 4:
+            continue
+        # Third cell is Finish Time; matching it identifies the row unambiguously.
+        if (cells.nth(2).inner_text() or "").strip() == want:
+            return row
+    raise LookupError(
+        f"{username}: no profile link, and no row with finish time {want}")
 
 
 def problem_cell(row, question_index, problem_count):
@@ -131,7 +165,8 @@ def problem_cell(row, question_index, problem_count):
 
 
 def events(session, contest_slug, username, question_index, problem_count=4,
-           ui_page=1, timeout_ms=15_000, attempts=3):
+           ui_page=1, timeout_ms=15_000, attempts=3, rank=None,
+           finish_offset=None):
     """Scrape one submission's Code Replay event history.
 
     Returns the parsed event list, or None when the submission has no replay.
@@ -141,23 +176,40 @@ def events(session, contest_slug, username, question_index, problem_count=4,
     empty result silently looks like "nothing suspicious", retry before
     accepting it.
     """
+    last_error = None
     for attempt in range(attempts):
-        got = _events_once(session, contest_slug, username, question_index,
-                           problem_count, ui_page, timeout_ms)
+        try:
+            got = _events_once(session, contest_slug, username, question_index,
+                               problem_count, ui_page, timeout_ms, rank,
+                               finish_offset)
+        except Exception as exc:
+            # A timeout is just as transient as an empty result, so retry it
+            # too rather than letting it escape and lose the submission.
+            last_error = exc
+            got = None
         if got:
             return got
         session.page.wait_for_timeout(700)
+        # Force a reload before the final try, in case the board drifted.
+        if attempt == attempts - 2:
+            try:
+                session.page.reload(wait_until="domcontentloaded")
+                session.page.wait_for_selector('a[href^="/u/"]', timeout=20_000)
+            except Exception:
+                pass
+    if last_error is not None:
+        raise last_error
     return None
 
 
 def _events_once(session, contest_slug, username, question_index, problem_count,
-                 ui_page, timeout_ms):
+                 ui_page, timeout_ms, rank=None, finish_offset=None):
     ensure_ranking_page(session, contest_slug, ui_page)
     page = session.page
     # A modal left open by the previous submission would swallow the next
     # click, so make sure the board is actually reachable first.
     _close(page)
-    row = find_row(page, username, timeout_ms)
+    row = find_row(page, username, timeout_ms, rank, finish_offset)
     cell = problem_cell(row, question_index, problem_count)
     if cell is None:
         return None
