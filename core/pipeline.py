@@ -85,15 +85,12 @@ class Pipeline:
                         if not sub_id or store.already_reported(conn, sub_id):
                             continue
 
-                        ctx = {"start_time": meta["start_time"],
-                               "credit": credit.get(qid),
-                               "question_slug": slug_of.get(qid, qid),
-                               "sweep_span": sweep,
-                               "progression": ctx_progression}
+                        qslug = slug_of.get(qid, qid)
 
-                        # Read the Code Replay event history. This is the whole
-                        # basis of the judgment, so a scrape failure must not be
-                        # silently treated as "nothing to see".
+                        # Read the Code Replay: both the event history and the
+                        # growth curve. This is the whole basis of the judgment,
+                        # so a failure must not be silently treated as
+                        # "nothing to see".
                         evs = None
                         ctx_progression = None
                         if sub.get("has_replay"):
@@ -112,9 +109,14 @@ class Pipeline:
                                     ctx_progression = got["progression"]
                             except Exception as exc:
                                 self.emit({"type": "log", "level": "warn",
-                                           "msg": f"{username} {ctx['question_slug']}: "
+                                           "msg": f"{username} {qslug}: "
                                                   f"replay unreadable ({exc})"})
 
+                        ctx = {"start_time": meta["start_time"],
+                               "credit": credit.get(qid),
+                               "question_slug": qslug,
+                               "sweep_span": sweep,
+                               "progression": ctx_progression}
                         verdict, score, reason, evidence = detector.analyse(evs, sub, ctx)
 
                         if verdict == detector.CLEAN:

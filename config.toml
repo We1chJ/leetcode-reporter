@@ -12,7 +12,7 @@ min_seconds_between_reports = 45
 [scope]
 # Leaderboard rank range to scan (inclusive, 1-based).
 rank_start = 1
-rank_end = 100
+rank_end = 8
 # Which contest problems to inspect. Empty list means all of them.
 questions = []
 # Seconds to wait between ranking/replay requests.

@@ -19,44 +19,25 @@ Single-user, runs on your machine, no hosting. Python core + a local web UI at
 
 ## How detection works
 
-It reads **LeetCode's own Code Replay event history** for each submission and
-judges it itself.
-
-There is no API for those events — opening a replay fires no request carrying
-them (see [`tools/FINDINGS.md`](tools/FINDINGS.md)). But the player has an
-"Event History" panel that lists every recorded editor event, and that panel is
-scrapable. LeetCode's event vocabulary:
+It scrubs the Code Replay timeline and measures **how much code exists at each
+point**. Work done in the editor grows the code steadily; a solution brought in
+from outside appears in one step. Measured on weekly-contest-515:
 
 ```
-start · switchQuestion · switchLang · pageVisible (Page Switch) · interpretCode
-submitCode · end · input · undo · redo · paste (External Paste) · changeCursor · debug
+rank 3   Q4, cheat     100 100 100 100  1  1  1  1  1  1 1474   biggest jump 100%
+rank 501, 42 min       110 110 110 110 110 184 256 296 382 484   biggest jump  21%
+rank 502, 42 min        89  89  89 110 145 177 242 292 357 418   biggest jump  16%
 ```
 
-**Typing is not recorded.** The panel lists only notable events, never
-keystrokes. Honest contestants (ranks 501-505, ~42 minute finishers) look like
-this:
-
-```
-Switch Language | 0:01 | Python3
-Run Code        | 6:12 | Accepted
-Submit Code     | 6:40 | Accepted
-```
-
-so "no typing events" is true of everybody and carries no information. The real
-discriminator is the **External Paste** event, which honest controls do not have
-at all. A blatant case, rank 3's Q4:
-
-```
-Switch Language | 0:01 | Java
-External Paste  | 1:16 | size > 500 chars | 🔴
-Run Code        | 1:18 | Accepted
-Submit Code     | 1:21 | Accepted
-```
+The gap between 21% and 100% is the whole signal, and it is what a person does
+when they check a replay by hand.
 
 | Reason code | Meaning | Score |
 |---|---|---|
+| `CODE_APPEARS_IN_ONE_STEP` | Most of the finished solution appears in a single timeline step | 0.98 |
 | `LARGE_PASTE_THEN_SUBMIT` | Large external paste, submitted seconds later | 0.96 |
 | `BURST_AFTER_IDLE` | Long silence, then one large external paste | 0.95 |
+| `NO_INCREMENTAL_PROGRESS` | Code never grows across the recording | 0.94 |
 | `REPEATED_LARGE_PASTES` | More than one large external paste | 0.93 |
 | `LARGE_EXTERNAL_PASTE` | A paste big enough to be the whole solution | 0.90 |
 | `IMPLAUSIBLE_SOLVE_SPEED` | Fallback when no replay exists; never auto-reports | ≤ 0.90 |
@@ -64,37 +45,27 @@ Submit Code     | 1:21 | Accepted
 At or above `cheat_threshold` (0.95) a report is filed. Between `grey_low` and
 that, the submission is recorded and shown in the UI but never auto-reported.
 
-### Known limitation
+### Growth overrides everything else
 
-Because typing is not recorded, a large paste followed by genuine work cannot be
-distinguished from a pasted solution that was then tweaked. Both score as
-violations. Pasting your own boilerplate is safe only while it stays under
-`large_paste_chars` (500). There is a fixture case documenting this tradeoff.
+If the code keeps growing across the timeline, the submission is **not reported
+at all**, whatever the event list says. Pasting your own template or library and
+then writing the solution around it is legitimate and must not be punished. This
+suppression caught a false positive in the test suite that the paste rules alone
+had reported.
 
-### Inactivity, then a burst
+### Why not the event list
 
-Writing a solution in the editor produces continuous incremental typing. The
-cheating shape is the opposite: nothing, nothing, nothing, then the whole
-solution at once. `BURST_AFTER_IDLE` keys on exactly that — a paste at or above
-`large_paste_chars` preceded by at least `idle_burst_seconds` of no activity.
-
-Idle on its own is **not** a signal. A contestant who pauses four minutes to
-think and then keeps typing stays clean; there is a control case for this in the
-test suite. It is the idle *ending in a paste* that counts.
+The replay also has an Event History panel, and it is read for corroboration,
+but it **does not record typing** - honest contestants' entire history is
+`Switch Language -> Run Code -> Submit Code`. An earlier version treated "zero
+typing events" as decisive, which is true of everybody, and judged 73% of the
+top 100 as cheating. The event list can see that a paste happened; only the
+growth curve can tell whether the code was then actually written.
 
 ### It does not trust LeetCode's own flag
 
-The ranking payload carries `not_enough_activities`, LeetCode's editor-activity
-check. **This tool ignores it for scoring** and records it as context only.
-
-It under-fires badly. On the real example above, the replay is a single external
-paste with no typing whatsoever — and `not_enough_activities` was **not** set.
-Gating on it would inherit every miss in LeetCode's detector, which is the whole
-reason for building this.
-
-Solve speed is likewise only a fallback for submissions with no replay, and
-otherwise mild corroboration. A tight clean sweep is not a signal at all: at the
-top of any leaderboard everyone finishes fast.
+`not_enough_activities` under-fires badly - it was unset on the rank 3 case
+above, whose code appears 100% in one step. Recorded as context only.
 
 ## Fully deterministic
 
