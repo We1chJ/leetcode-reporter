@@ -230,6 +230,72 @@
         1667,
         1667
       ]
+    },
+    {
+      "label": "REAL: rank 15 Q4 - ten pastes, curve looks like authoring",
+      "user": "vinaypinagadi",
+      "question": "elevator-requests-iii",
+      "credit": 6,
+      "seconds_after_start": 2000,
+      "leetcode_flag": false,
+      "expect": "cheat",
+      "_note": "The case that disproved the growth curve as a standalone signal. Its curve (jump 0.27, 7 growth steps) reads as textbook authoring; the history shows every character arrived by paste.",
+      "rows": [
+        "Switch Language | 0:01 | C++",
+        "External Paste | 1:00 | size 160 chars",
+        "External Paste | 2:00 | size 160 chars",
+        "External Paste | 3:00 | size 160 chars",
+        "External Paste | 4:00 | size 160 chars",
+        "External Paste | 5:00 | size 160 chars",
+        "External Paste | 6:00 | size 160 chars",
+        "External Paste | 7:00 | size 160 chars",
+        "External Paste | 8:00 | size 160 chars",
+        "External Paste | 9:00 | size 160 chars",
+        "External Paste | 10:00 | size 160 chars",
+        "Run Code | 12:00 | Accepted | Details",
+        "Submit Code | 13:00 | Accepted | Details"
+      ],
+      "progression": [
+        159,
+        159,
+        159,
+        159,
+        309,
+        547,
+        676,
+        1077,
+        1530,
+        1655,
+        1667,
+        1667
+      ]
+    },
+    {
+      "label": "REAL honest: rank 501 - no paste, gradual growth",
+      "user": "SoumyaKanti16-b",
+      "question": "control-no-paste",
+      "credit": 3,
+      "seconds_after_start": 2520,
+      "leetcode_flag": false,
+      "expect": "clean",
+      "rows": [
+        "Switch Language | 0:01 | Python3",
+        "Run Code | 6:12 | Accepted | Details",
+        "Submit Code | 6:40 | Accepted | Details"
+      ],
+      "progression": [
+        110,
+        110,
+        110,
+        110,
+        110,
+        184,
+        256,
+        296,
+        382,
+        484,
+        484
+      ]
     }
   ]
 }

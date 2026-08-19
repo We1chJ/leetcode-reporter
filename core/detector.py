@@ -1,31 +1,27 @@
-"""Deterministic judgment on a contest submission, from its Code Replay events.
+"""Deterministic judgment on a contest submission, from its Code Replay.
 
-No model is involved anywhere in this module. Same events in, same verdict out.
+No model is involved anywhere in this module. Same input, same verdict.
 
-This deliberately does NOT defer to LeetCode's `not_enough_activities` flag.
-That flag under-fires: on weekly-contest-515 it was unset on rank 3's Q4, whose
-own event history is `Switch Language -> External Paste (>500 chars) -> Run Code
--> Submit Code` with zero Input events. It is recorded as context, nothing more.
+**External Paste events are the primary signal, and they are ground truth.**
+LeetCode records them itself; they say where the code came from rather than
+inferring it. Honest contestants in the control sample (ranks 501-505, ~42
+minute finishers) had none at all.
 
-What the Event History actually contains, established by sampling honest
-contestants (ranks 501-505 of weekly-contest-515, all ~42 minute finishers):
+The growth curve -- how much code exists at each point of the timeline -- was
+tried as the primary signal and is not sufficient on its own. vinaypinagadi,
+rank 15, produced a textbook authoring curve (132 -> 182 -> 361 -> 370 -> 543,
+biggest jump 33%) while their event history is:
 
-    Switch Language -> Run Code -> Submit Code
+    Switch Language -> Paste -> Paste -> Paste -> Run -> Submit
 
-**Typing is not recorded.** The panel lists only notable events -- language
-switches, runs, submissions, external pastes, page switches -- never individual
-keystrokes. `Input` exists in LeetCode's event vocabulary but does not appear in
-practice, so "zero typing events" is true of everybody and carries no
-information. An earlier version of this module treated it as the decisive signal
-and consequently judged 73% of the top 100 as cheating.
+Every one of those "growth steps" was a paste. Pasting in pieces is
+indistinguishable from typing by curve shape alone, so the curve is now only
+consulted when the history records no paste at all -- where it still catches
+code that appears in one step without a recorded paste.
 
-So the judgment rests on what the history does record:
-  - External Paste, LeetCode's own label for content arriving from outside the
-    editor, with a size. Honest contestants in the control sample had none.
-  - The timestamps around it: idle before the paste, and paste to submission.
-  - Whether the code was ever run between pasting and submitting.
+Typing itself is never recorded, so nothing here may claim its absence.
 
-Nothing here proves the absence of typing, and no rule or report may claim it.
+LeetCode's own `not_enough_activities` flag under-fires and is context only.
 """
 
 from core import config
@@ -33,6 +29,7 @@ from core.replay import PAGE_SWITCH, PASTE, RUN, SUBMIT
 
 # --- reason codes ---------------------------------------------------------
 EXTERNAL_PASTE_PRESENT = "EXTERNAL_PASTE_PRESENT"
+PASTED_IN_PIECES = "PASTED_IN_PIECES"
 CODE_APPEARS_IN_ONE_STEP = "CODE_APPEARS_IN_ONE_STEP"
 NO_INCREMENTAL_PROGRESS = "NO_INCREMENTAL_PROGRESS"
 LARGE_PASTE_THEN_SUBMIT = "LARGE_PASTE_THEN_SUBMIT"
@@ -47,6 +44,10 @@ REASON_TEXT = {
     EXTERNAL_PASTE_PRESENT:
         "the Code Replay records an external paste - code brought into the "
         "editor from outside it rather than written in place",
+    PASTED_IN_PIECES:
+        "the Code Replay records the solution arriving as a series of external "
+        "pastes, one after another, with no code written in the editor between "
+        "them",
     CODE_APPEARS_IN_ONE_STEP:
         "stepping through the Code Replay shows the editor essentially empty "
         "and then, in a single step of the timeline, holding the complete "
@@ -175,10 +176,10 @@ def analyse(events, sub, ctx):
 
     reasons = []
 
-    # The growth curve is authoritative when we have it. Code that keeps
-    # growing across the timeline was being worked on, whatever else happened:
-    # someone may well paste their own template or library and then write the
-    # solution around it, and that must not be reported.
+    # The growth curve decides whether the code was written here, and that
+    # governs the burst rules below. It does NOT excuse an external paste:
+    # under report_any_paste, a paste is reportable even when the code
+    # otherwise grew normally.
     authored = False
     prog = ctx.get("progression")
     if prog:
@@ -189,43 +190,42 @@ def analyse(events, sub, ctx):
         authored = (g["growth_steps"] > d["min_growth_steps"] and
                     g["growth_excluding_jump_fraction"] >= d["authored_fraction"])
         evidence["shows_ongoing_authoring"] = authored
-        if g["peak_chars"] >= d["min_solution_chars"] and not authored:
-            if g["biggest_jump_fraction"] >= d["burst_fraction"]:
-                reasons.append((CODE_APPEARS_IN_ONE_STEP, 0.98))
-            else:
-                reasons.append((NO_INCREMENTAL_PROGRESS, 0.94))
 
-    if events:
+    if events is not None:
         s = summarise(events)
         evidence.update(s)
 
-        # Any external paste at all counts. Honest contestants in the control
-        # sample had none; the cost of this rule is that pasting your own
-        # template or library is also reported.
-        if s["paste_events"] and d["report_any_paste"]:
-            reasons.append((EXTERNAL_PASTE_PRESENT, 0.96))
-
-    if events and not authored:
-        s = summarise(events)
-        big = s["largest_paste_chars"] >= d["large_paste_chars"]
-        gap = None
-        if s["last_paste_t"] is not None and s["submit_t"] is not None:
-            gap = s["submit_t"] - s["last_paste_t"]
-            evidence["paste_to_submit_seconds"] = gap
-
-        if s["paste_events"] and big:
-            # Pasted the bulk of a solution in, then submitted it straight away.
-            if gap is not None and 0 <= gap <= d["instant_submit_seconds"]:
-                reasons.append((LARGE_PASTE_THEN_SUBMIT, 0.96))
-
-            # Inactivity, then a sudden burst of pasted code.
-            if (s["idle_before_largest_paste"] or 0) >= d["idle_burst_seconds"]:
-                reasons.append((BURST_AFTER_IDLE, 0.95))
-
+        if s["paste_events"]:
+            # Ground truth: this code came from outside the editor. Which rule
+            # names it only changes the wording of the report, not the verdict.
+            if s["paste_events"] >= d["pieces_paste_count"]:
+                # Arriving in many pieces mimics typing on the growth curve,
+                # which is exactly how rank 15 read as authored.
+                reasons.append((PASTED_IN_PIECES, 0.98))
+            big = s["largest_paste_chars"] >= d["large_paste_chars"]
+            gap = None
+            if s["last_paste_t"] is not None and s["submit_t"] is not None:
+                gap = s["submit_t"] - s["last_paste_t"]
+                evidence["paste_to_submit_seconds"] = gap
+            if big and gap is not None and 0 <= gap <= d["instant_submit_seconds"]:
+                reasons.append((LARGE_PASTE_THEN_SUBMIT, 0.97))
+            if big and (s["idle_before_largest_paste"] or 0) >= d["idle_burst_seconds"]:
+                reasons.append((BURST_AFTER_IDLE, 0.96))
             if s["paste_events"] >= 2:
-                reasons.append((REPEATED_LARGE_PASTES, 0.93))
-
-            reasons.append((LARGE_EXTERNAL_PASTE, 0.90))
+                reasons.append((REPEATED_LARGE_PASTES, 0.96))
+            if big:
+                reasons.append((LARGE_EXTERNAL_PASTE, 0.96))
+            if d["report_any_paste"]:
+                reasons.append((EXTERNAL_PASTE_PRESENT, 0.96))
+        elif prog:
+            # No paste recorded. The curve is the remaining check: code that
+            # appears all at once was not written here either.
+            g = summarise_progression(prog)
+            if g["peak_chars"] >= d["min_solution_chars"] and not authored:
+                if g["biggest_jump_fraction"] >= d["burst_fraction"]:
+                    reasons.append((CODE_APPEARS_IN_ONE_STEP, 0.98))
+                else:
+                    reasons.append((NO_INCREMENTAL_PROGRESS, 0.94))
     else:
         evidence["replay_available"] = False
 

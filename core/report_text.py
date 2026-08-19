@@ -57,6 +57,16 @@ def _curve(e):
 
 
 BODIES = {
+    D.PASTED_IN_PIECES: lambda e: (
+        f" LeetCode's Code Replay records {e.get('paste_events', 0)} separate "
+        f"external paste events for this submission, totalling "
+        f"{e.get('pasted_chars', 0)} characters, across a session of "
+        f"{e.get('session_seconds', 0)} seconds."
+        + _timeline(e) +
+        " The solution was assembled from blocks brought in from outside the "
+        "editor one after another. Note that pasting in pieces produces a "
+        "gradual-looking growth curve; the paste events are what identify it."),
+
     D.CODE_APPEARS_IN_ONE_STEP: lambda e: (
         f" Stepping through LeetCode's Code Replay for this submission shows "
         f"the solution appearing all at once rather than being written. "

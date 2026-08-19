@@ -19,53 +19,52 @@ Single-user, runs on your machine, no hosting. Python core + a local web UI at
 
 ## How detection works
 
-It scrubs the Code Replay timeline and measures **how much code exists at each
-point**. Work done in the editor grows the code steadily; a solution brought in
-from outside appears in one step. Measured on weekly-contest-515:
-
-```
-rank 3   Q4, cheat     100 100 100 100  1  1  1  1  1  1 1474   biggest jump 100%
-rank 501, 42 min       110 110 110 110 110 184 256 296 382 484   biggest jump  21%
-rank 502, 42 min        89  89  89 110 145 177 242 292 357 418   biggest jump  16%
-```
-
-The gap between 21% and 100% is the whole signal, and it is what a person does
-when they check a replay by hand.
+**External Paste events are the primary signal, and they are ground truth.**
+LeetCode records them itself: they say where code came from rather than
+inferring it. Honest contestants in the control sample (ranks 501-505, ~42
+minute finishers) had none at all. Any paste is reportable.
 
 | Reason code | Meaning | Score |
 |---|---|---|
-| `CODE_APPEARS_IN_ONE_STEP` | Most of the finished solution appears in a single timeline step | 0.98 |
-| `LARGE_PASTE_THEN_SUBMIT` | Large external paste, submitted seconds later | 0.96 |
-| `BURST_AFTER_IDLE` | Long silence, then one large external paste | 0.95 |
-| `NO_INCREMENTAL_PROGRESS` | Code never grows across the recording | 0.94 |
-| `REPEATED_LARGE_PASTES` | More than one large external paste | 0.93 |
-| `LARGE_EXTERNAL_PASTE` | A paste big enough to be the whole solution | 0.90 |
-| `IMPLAUSIBLE_SOLVE_SPEED` | Fallback when no replay exists; never auto-reports | ≤ 0.90 |
+| `PASTED_IN_PIECES` | Three or more pastes in sequence | 0.98 |
+| `CODE_APPEARS_IN_ONE_STEP` | No paste recorded, but the code appears in one timeline step | 0.98 |
+| `LARGE_PASTE_THEN_SUBMIT` | Large paste, submitted seconds later | 0.97 |
+| `BURST_AFTER_IDLE` / `REPEATED_LARGE_PASTES` / `LARGE_EXTERNAL_PASTE` / `EXTERNAL_PASTE_PRESENT` | Any external paste | 0.96 |
+| `NO_INCREMENTAL_PROGRESS` | No paste, and the code never grows | 0.94 |
+| `IMPLAUSIBLE_SOLVE_SPEED` | No replay at all; never auto-reports | ≤ 0.90 |
 
-At or above `cheat_threshold` (0.95) a report is filed. Between `grey_low` and
-that, the submission is recorded and shown in the UI but never auto-reported.
+### Why the growth curve is only a fallback
 
-### Growth overrides everything else
+Scrubbing the timeline and measuring how much code exists at each point was
+tried as the primary signal. It is not sufficient. Rank 15 produced a textbook
+authoring curve:
 
-If the code keeps growing across the timeline, the submission is **not reported
-at all**, whatever the event list says. Pasting your own template or library and
-then writing the solution around it is legitimate and must not be punished. This
-suppression caught a false positive in the test suite that the paste rules alone
-had reported.
+```
+132 132 132 132 132 132 132 132 182 361 370 543     jump 33%, 4 growth steps
+```
 
-### Why not the event list
+and their event history is:
 
-The replay also has an Event History panel, and it is read for corroboration,
-but it **does not record typing** - honest contestants' entire history is
-`Switch Language -> Run Code -> Submit Code`. An earlier version treated "zero
-typing events" as decisive, which is true of everybody, and judged 73% of the
-top 100 as cheating. The event list can see that a paste happened; only the
-growth curve can tell whether the code was then actually written.
+```
+Switch Language -> Paste -> Paste -> Paste -> Run -> Submit
+```
+
+Every "growth step" was a paste. **Pasting in pieces is indistinguishable from
+typing by curve shape alone**, which is why `PASTED_IN_PIECES` exists and why
+the curve is now consulted only when the history records no paste - where it
+still catches code appearing in one step with no paste event. Skipping the
+scrub when a paste is already recorded also makes scans substantially faster.
+
+### Known cost
+
+`report_any_paste = true` means pasting your own template or library is
+reported too. Deliberate: the control sample had zero pastes, so the trade
+looks cheap in practice, but it is a trade. One switch in `config.toml`.
 
 ### It does not trust LeetCode's own flag
 
-`not_enough_activities` under-fires badly - it was unset on the rank 3 case
-above, whose code appears 100% in one step. Recorded as context only.
+`not_enough_activities` under-fires - unset on cases whose code appears 100% in
+one step. Recorded as context only.
 
 ## Fully deterministic
 

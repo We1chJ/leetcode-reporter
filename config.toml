@@ -39,6 +39,9 @@ authored_fraction = 0.30
 # Treat any external paste as reportable, regardless of size or what follows.
 # This also reports people who paste their own template.
 report_any_paste = true
+# Pastes arriving one after another. Rank 15 built an entire solution from ten
+# of them, producing a growth curve that looked like ordinary typing.
+pieces_paste_count = 3
 # Ignore trivially short solutions, where one step is meaningless.
 min_solution_chars = 200
 # Points sampled along the replay timeline.

@@ -320,7 +320,7 @@ def _events_once(session, contest_slug, username, question_index, problem_count,
 
 def inspect(session, contest_slug, username, question_index, problem_count=4,
             ui_page=1, timeout_ms=15_000, samples=PROGRESSION_SAMPLES,
-            attempts=2, rank=None, finish_offset=None):
+            attempts=2, rank=None, finish_offset=None, always_progression=False):
     """Open a submission once and read both its history and its growth curve.
 
     Returns {"events": [...], "progression": [chars, ...]} or None. One modal
@@ -335,9 +335,13 @@ def inspect(session, contest_slug, username, question_index, problem_count=4,
             if page is None:
                 return None
             evs = _read_events(page)
-            prog = _read_progression(page, samples)
+            # Scrubbing costs a dozen clicks. When the history already records a
+            # paste the verdict does not depend on the curve, so skip it.
+            has_paste = bool(evs) and any(e["type"] == PASTE for e in evs)
+            prog = (None if has_paste and not always_progression
+                    else _read_progression(page, samples))
             _close(page)
-            if prog:
+            if prog or has_paste:
                 return {"events": evs or [], "progression": prog}
         except Exception as exc:
             last_error = exc
