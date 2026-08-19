@@ -55,3 +55,17 @@ th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--lin
 th { color: var(--dim); font-weight: 500; font-size: 12px;
      text-transform: uppercase; letter-spacing: .04em; }
 td.narrative { color: var(--dim); max-width: 520px; }
+
+/* Lifetime counters. These never reset; they are the running total across
+   every scan the app has ever done. */
+.stats { display: flex; gap: 10px; flex-wrap: wrap; padding: 16px 20px 0; }
+.stat {
+  display: flex; flex-direction: column; gap: 2px; min-width: 130px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px 14px;
+}
+.stat .n { font-size: 22px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.stat .l { font-size: 11px; color: var(--dim); text-transform: uppercase;
+           letter-spacing: .04em; }
+.stat.big { border-color: #573f18; }
+.stat.big .n { color: var(--accent); font-size: 30px; }

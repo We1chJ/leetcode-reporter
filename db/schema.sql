@@ -1,12 +1,3 @@
-CREATE TABLE IF NOT EXISTS offenders (
-    username      TEXT PRIMARY KEY,
-    first_seen    TEXT NOT NULL,
-    last_seen     TEXT NOT NULL,
-    report_count  INTEGER NOT NULL DEFAULT 0,
-    contest_count INTEGER NOT NULL DEFAULT 0,
-    notes         TEXT
-);
-
 CREATE TABLE IF NOT EXISTS reports (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT NOT NULL,
@@ -36,4 +27,11 @@ CREATE TABLE IF NOT EXISTS scans (
     status        TEXT NOT NULL DEFAULT 'running'
 );
 
-CREATE INDEX IF NOT EXISTS idx_reports_user ON reports (username);
+-- Lifetime counters, never reset. Survives scans, restarts and reinstalls of
+-- the app as long as the database file is kept.
+CREATE TABLE IF NOT EXISTS stats (
+    key   TEXT PRIMARY KEY,
+    value INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_contest ON reports (contest_slug);

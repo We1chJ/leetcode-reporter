@@ -66,6 +66,7 @@ class Pipeline:
                         status = "stopped"
                         break
                     scanned += 1
+                    store.bump(conn, store.SCANNED)
                     username = row["username"]
                     self.emit({"type": "progress", "rank": row["rank"], "user": username})
 
@@ -95,8 +96,10 @@ class Pipeline:
                         evs = None
                         if sub.get("has_replay"):
                             try:
-                                evs = replay.events(session, contest_slug,
-                                                    username, index_of[qid])
+                                evs = replay.events(
+                                    session, contest_slug, username,
+                                    index_of[qid],
+                                    ui_page=(row["rank"] - 1) // 25 + 1)
                             except Exception as exc:
                                 self.emit({"type": "log", "level": "warn",
                                            "msg": f"{username} {ctx['question_slug']}: "
@@ -110,14 +113,13 @@ class Pipeline:
                         if verdict == detector.GREY:
                             # Recorded for review, never auto-reported.
                             flagged += 1
-                            store.touch_offender(conn, username, contest_slug, False)
+                            store.bump(conn, store.SUSPICIOUS)
                             self.emit({"type": "log",
                                        "msg": f"{username} {ctx['question_slug']}: "
                                               f"grey ({score}) {reason} - not reported"})
                             continue
 
-                        flagged += 1
-                        store.touch_offender(conn, username, contest_slug, False)
+                        store.bump(conn, store.CAUGHT)
 
                         if reported >= safety["max_reports_per_contest"]:
                             self.emit({"type": "log", "level": "warn",
@@ -161,7 +163,8 @@ class Pipeline:
 
                         last_report_at = time.time()
                         reported += 1
-                        store.touch_offender(conn, username, contest_slug, True)
+                        if outcome == "submitted":
+                            store.bump(conn, store.REPORTED)
                         self.emit({"type": "report", "user": username,
                                    "question": ctx["question_slug"], "reason": reason,
                                    "score": score, "outcome": outcome})
@@ -169,6 +172,7 @@ class Pipeline:
             status = "error"
             self.emit({"type": "log", "level": "error", "msg": f"scan failed: {exc}"})
         finally:
+            store.bump(conn, store.CONTESTS)
             store.finish_scan(conn, scan_id, scanned, flagged, reported, status)
             conn.close()
             self.running = False

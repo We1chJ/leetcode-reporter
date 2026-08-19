@@ -48,11 +48,12 @@ def stop():
     return {"ok": True}
 
 
-@app.get("/api/offenders")
-def offenders():
+@app.get("/api/stats")
+def stats():
+    """Lifetime totals across every scan ever run."""
     conn = store.connect()
     try:
-        return store.offenders(conn)
+        return store.stats(conn)
     finally:
         conn.close()
 

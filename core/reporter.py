@@ -10,21 +10,20 @@ narrative is still persisted by the caller.
 
 import time
 
-from core.browser import BASE
+from core import replay
 
 
 class ReportError(RuntimeError):
     pass
 
 
-def open_submission(session, contest_slug, username, question_index):
+def open_submission(session, contest_slug, username, question_index, ui_page=1):
     """Open the ranking page for a contestant and click into their submission.
 
     question_index is 0-based across the contest's problems.
     """
     page = session.page
-    page.goto(f"{BASE}/contest/{contest_slug}/ranking/?region=global",
-              wait_until="domcontentloaded")
+    replay.ensure_ranking_page(session, contest_slug, ui_page)
     row = page.locator("tr", has=page.get_by_role("link", name=username)).first
     row.wait_for(timeout=20_000)
     icons = row.locator("td a[href*='submission'], td svg").all()
@@ -53,10 +52,10 @@ def submit_report(session, narrative, dry_run=True):
 
 
 def file_report(session, *, contest_slug, username, question_index, narrative,
-                dry_run=True):
+                ui_page=1, dry_run=True):
     """Full report flow for one submission. Returns the outcome string."""
     if dry_run:
         # Never touch the network in dry-run; the narrative is already persisted.
         return "dry_run"
-    open_submission(session, contest_slug, username, question_index)
+    open_submission(session, contest_slug, username, question_index, ui_page)
     return submit_report(session, narrative, dry_run=False)

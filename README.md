@@ -108,9 +108,30 @@ HTTP, which is why this drives a real browser rather than using `requests`.)
 
 ## Use
 
-Enter a contest slug (`weekly-contest-515`) and press **Scan contest**. Tabs
-show the live log, the offender table with per-user report counts, full report
-history including the exact text sent, and past scans.
+Enter a contest slug (`weekly-contest-515`) and press **Scan contest**. Tabs show
+the live log, the full report history including the exact text sent, and past
+scans. Or from a terminal:
+
+```
+python -m tools.scan weekly-contest-515
+```
+
+### Lifetime counters
+
+The header shows running totals across every scan the app has ever done, kept in
+the `stats` table and never reset:
+
+- **cheating submissions caught** — judged as violations
+- reports submitted — actually sent to LeetCode (dry runs excluded)
+- suspicious, not reported — grey zone
+- submissions scanned, contests scanned
+
+### No per-user history
+
+The tool does **not** build a profile of who has cheated before, and does not use
+past behaviour to judge a new submission. Every submission is judged only on its
+own event history. The `reports` table keeps what was sent, as an audit trail and
+to avoid filing the same report twice, but nothing aggregates it per user.
 
 Check the detector offline against captured event histories — real cheats plus
 controls that must stay clean. No LeetCode access needed:
@@ -136,9 +157,9 @@ turning `dry_run` off.
 
 ```
 core/      browser, contest scraping, detection, report text, reporting, pipeline
-db/        SQLite schema and store
+db/        SQLite schema and store (reports, scans, lifetime counters)
 web/       dashboard
-tools/     discovery spike, API findings, offline calibration
+tools/     scan runner, discovery spike, API findings, offline calibration
 ```
 
 ## Status

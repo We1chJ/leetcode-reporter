@@ -56,11 +56,16 @@ async function refresh() {
   $("#mode").textContent = dry ? "dry run" : "live reporting";
   $("#mode").className = "pill" + (dry ? "" : " live");
 
-  $("#offenders").innerHTML = table(await (await fetch("/api/offenders")).json(), [
-    ["username", "User"], ["report_count", "Reports"],
-    ["contest_count", "Contests"], ["first_seen", "First seen"],
-    ["last_seen", "Last seen"],
-  ]);
+  const st = await (await fetch("/api/stats")).json();
+  $("#stats").innerHTML = [
+    ["Cheating submissions caught", st.cheating_submissions_caught, "big"],
+    ["Reports submitted", st.reports_submitted],
+    ["Suspicious, not reported", st.suspicious_recorded],
+    ["Submissions scanned", st.submissions_scanned],
+    ["Contests scanned", st.contests_scanned],
+  ].map(([label, value, cls]) =>
+    `<div class="stat ${cls || ""}"><span class="n">${value ?? 0}</span>` +
+    `<span class="l">${label}</span></div>`).join("");
   $("#reports").innerHTML = table(await (await fetch("/api/reports")).json(), [
     ["username", "User"], ["contest_slug", "Contest"],
     ["question_slug", "Problem"], ["reason_code", "Reason"],

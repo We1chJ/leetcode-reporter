@@ -83,12 +83,29 @@ def _open_event_list(page):
     return False
 
 
-def events(session, contest_slug, username, question_index, timeout_ms=15_000):
+RANKING_URL = "https://leetcode.com/contest/{slug}/ranking/{page}?region=global_v2"
+
+
+def ensure_ranking_page(session, contest_slug, ui_page=1):
+    """Open the ranking page holding a given block of 25 contestants.
+
+    The replay modal can only be opened from the ranking table, so the right
+    page has to be on screen before scraping. Cheap no-op when already there.
+    """
+    want = RANKING_URL.format(slug=contest_slug,
+                              page="" if ui_page <= 1 else f"{ui_page}/")
+    if session.page.url.split("#")[0] != want:
+        session.page.goto(want, wait_until="domcontentloaded")
+        session.page.wait_for_selector("tr", timeout=20_000)
+
+
+def events(session, contest_slug, username, question_index, ui_page=1,
+           timeout_ms=15_000):
     """Scrape one submission's Code Replay event history.
 
-    Assumes the ranking page for `contest_slug` is already open. Returns the
-    parsed event list, or None when the submission has no replay.
+    Returns the parsed event list, or None when the submission has no replay.
     """
+    ensure_ranking_page(session, contest_slug, ui_page)
     page = session.page
     row = page.locator("tr", has=page.get_by_role("link", name=username)).first
     row.wait_for(timeout=timeout_ms)

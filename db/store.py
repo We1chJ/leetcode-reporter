@@ -1,4 +1,4 @@
-"""SQLite persistence: offenders, reports, scans."""
+"""SQLite persistence: reports, scans, and lifetime counters."""
 
 import json
 import sqlite3
@@ -64,39 +64,34 @@ def reports(conn, limit=200):
     return [dict(r) for r in rows]
 
 
-# --- offenders -----------------------------------------------------------
+# --- lifetime counters ------------------------------------------------
 
-def touch_offender(conn, username, contest_slug, counted_report):
-    """Upsert the offender row. contest_count counts distinct contests."""
-    row = conn.execute(
-        "SELECT username FROM offenders WHERE username=?", (username,)
-    ).fetchone()
-    if row is None:
-        conn.execute(
-            "INSERT INTO offenders (username, first_seen, last_seen) VALUES (?,?,?)",
-            (username, _now(), _now()),
-        )
-    conn.execute("UPDATE offenders SET last_seen=? WHERE username=?", (_now(), username))
-    if counted_report:
-        contests = conn.execute(
-            "SELECT COUNT(DISTINCT contest_slug) c FROM reports WHERE username=?",
-            (username,),
-        ).fetchone()["c"]
-        total = conn.execute(
-            "SELECT COUNT(*) c FROM reports WHERE username=?", (username,)
-        ).fetchone()["c"]
-        conn.execute(
-            "UPDATE offenders SET report_count=?, contest_count=? WHERE username=?",
-            (total, contests, username),
-        )
+# Totals across every scan ever run, not per user and not per contest.
+CAUGHT = "cheating_submissions_caught"   # judged CHEAT
+REPORTED = "reports_submitted"           # actually sent to LeetCode
+SUSPICIOUS = "suspicious_recorded"       # grey zone, never auto-reported
+SCANNED = "submissions_scanned"
+CONTESTS = "contests_scanned"
+
+
+def bump(conn, key, n=1):
+    """Add to a lifetime counter, creating it on first use."""
+    if not n:
+        return
+    conn.execute(
+        "INSERT INTO stats (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = value + excluded.value",
+        (key, n),
+    )
     conn.commit()
 
 
-def offenders(conn):
-    rows = conn.execute(
-        "SELECT * FROM offenders ORDER BY report_count DESC, last_seen DESC"
-    ).fetchall()
-    return [dict(r) for r in rows]
+def stats(conn):
+    rows = conn.execute("SELECT key, value FROM stats").fetchall()
+    out = {r["key"]: r["value"] for r in rows}
+    for k in (CAUGHT, REPORTED, SUSPICIOUS, SCANNED, CONTESTS):
+        out.setdefault(k, 0)
+    return out
 
 
 # --- scans ---------------------------------------------------------------

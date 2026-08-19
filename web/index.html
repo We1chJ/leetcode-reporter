@@ -14,6 +14,8 @@
   <span id="mode" class="pill">…</span>
 </header>
 
+<section class="stats" id="stats"></section>
+
 <section class="controls">
   <input id="slug" placeholder="weekly-contest-450" autocomplete="off">
   <button id="scan">Scan contest</button>
@@ -23,14 +25,12 @@
 
 <nav class="tabs">
   <button class="tab active" data-tab="log">Live log</button>
-  <button class="tab" data-tab="offenders">Offenders</button>
   <button class="tab" data-tab="reports">Reports</button>
   <button class="tab" data-tab="scans">Scans</button>
 </nav>
 
 <main>
   <div id="log" class="panel active"><pre id="logbody"></pre></div>
-  <div id="offenders" class="panel"></div>
   <div id="reports" class="panel"></div>
   <div id="scans" class="panel"></div>
 </main>

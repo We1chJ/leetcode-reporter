@@ -47,17 +47,22 @@ class Session:
         LEETCODE_SESSION is HttpOnly, so it is invisible to page JavaScript --
         ask the API instead of sniffing document.cookie.
         """
-        if self.page.url == "about:blank":
+        # Relative fetches only resolve correctly from a leetcode.com page; a
+        # fresh persistent profile starts on about:blank or the new-tab page.
+        if "leetcode.com" not in self.page.url:
             self.page.goto(f"{BASE}/contest/", wait_until="domcontentloaded")
         res = self.page.evaluate(
             """async () => {
-                const r = await fetch('/graphql/', {method: 'POST',
-                    credentials: 'include',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(
-                        {query: '{ userStatus { isSignedIn username } }'})});
-                const j = await r.json();
-                return j.data && j.data.userStatus;
+                try {
+                    const r = await fetch('/graphql/', {method: 'POST',
+                        credentials: 'include',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(
+                            {query: '{ userStatus { isSignedIn username } }'})});
+                    if (!r.ok) return null;
+                    const j = await r.json();
+                    return j.data && j.data.userStatus;
+                } catch (e) { return null; }   // signed out serves HTML, not JSON
             }"""
         )
         return res["username"] if res and res.get("isSignedIn") else None
