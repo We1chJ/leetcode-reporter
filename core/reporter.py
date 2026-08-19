@@ -17,20 +17,20 @@ class ReportError(RuntimeError):
     pass
 
 
-def open_submission(session, contest_slug, username, question_index, ui_page=1):
+def open_submission(session, contest_slug, username, question_index,
+                    problem_count=4, ui_page=1):
     """Open the ranking page for a contestant and click into their submission.
 
     question_index is 0-based across the contest's problems.
     """
     page = session.page
     replay.ensure_ranking_page(session, contest_slug, ui_page)
-    row = page.locator("tr", has=page.get_by_role("link", name=username)).first
-    row.wait_for(timeout=20_000)
-    icons = row.locator("td a[href*='submission'], td svg").all()
-    if question_index >= len(icons):
+    row = replay.find_row(page, username)
+    cell = replay.problem_cell(row, question_index, problem_count)
+    if cell is None:
         raise ReportError(
             f"{username}: no submission cell at index {question_index}")
-    icons[question_index].click()
+    cell.locator("svg").last.click()
     page.get_by_text("Report Cheating", exact=False).first.wait_for(timeout=20_000)
 
 
@@ -52,10 +52,11 @@ def submit_report(session, narrative, dry_run=True):
 
 
 def file_report(session, *, contest_slug, username, question_index, narrative,
-                ui_page=1, dry_run=True):
+                problem_count=4, ui_page=1, dry_run=True):
     """Full report flow for one submission. Returns the outcome string."""
     if dry_run:
         # Never touch the network in dry-run; the narrative is already persisted.
         return "dry_run"
-    open_submission(session, contest_slug, username, question_index, ui_page)
+    open_submission(session, contest_slug, username, question_index,
+                    problem_count, ui_page)
     return submit_report(session, narrative, dry_run=False)

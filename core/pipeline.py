@@ -98,7 +98,7 @@ class Pipeline:
                             try:
                                 evs = replay.events(
                                     session, contest_slug, username,
-                                    index_of[qid],
+                                    index_of[qid], problem_count=len(qs),
                                     ui_page=(row["rank"] - 1) // 25 + 1)
                             except Exception as exc:
                                 self.emit({"type": "log", "level": "warn",
@@ -153,6 +153,8 @@ class Pipeline:
                             outcome = reporter.file_report(
                                 session, contest_slug=contest_slug, username=username,
                                 question_index=index_of[qid], narrative=text,
+                                problem_count=len(qs),
+                                ui_page=(row["rank"] - 1) // 25 + 1,
                                 dry_run=dry_run)
                             store.mark_report(conn, report_id, outcome)
                         except Exception as exc:

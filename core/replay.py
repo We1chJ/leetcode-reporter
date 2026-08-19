@@ -25,6 +25,13 @@ REPORT = "/contest/api/reports/submissions/{contest_submission_id}/"
 # The Event History list container inside the replay modal.
 EVENT_LIST = "div.flex.flex-1.flex-col.overflow-y-auto"
 
+# The ranking "table" is not a table: there is no <table>, <tr> or <td> on the
+# page at all, only nested divs. A contestant's row is the nearest ancestor of
+# their profile link that spans the full width, and its last N children are the
+# per-problem cells (the rank number lives outside the row, in a sticky column).
+ROW_FROM_LINK = ('xpath=ancestor::div[contains(@class,"h-[50px]")'
+                 ' and contains(@class,"w-full")][1]')
+
 INPUT = "Input"
 PASTE = "External Paste"
 SUBMIT = "Submit Code"
@@ -66,21 +73,28 @@ def parse_rows(rows):
     return out
 
 
+def _event_toggle(page):
+    """The Event History toggle button in the player footer.
+
+    It carries no aria-label, but it is a real toggle: aria-pressed / data-state
+    report whether the panel is open, so its state can be read rather than
+    guessed. Never select the last footer button -- that one is "Close".
+    """
+    # Not scoped to the dialog: the footer controls sit outside the element
+    # that carries role="dialog".
+    btns = page.locator("button[aria-pressed]")
+    return btns.last if btns.count() else None
+
+
 def _open_event_list(page):
-    """Toggle the Event History panel open, if it is not already."""
-    for sel in ('button[aria-label="Toggle Event List"]',
-                'button[title="Toggle Event List"]',
-                '[aria-label="Toggle Event List"]'):
-        btn = page.locator(sel)
-        if btn.count():
-            btn.first.click()
-            return True
-    # Fall back to the last icon button in the player footer.
-    btns = page.locator("div[role='dialog'] button, .fixed button")
-    if btns.count():
-        btns.last.click()
-        return True
-    return False
+    """Ensure the Event History panel is open. Safe to call when already open."""
+    btn = _event_toggle(page)
+    if btn is None:
+        return False
+    if (btn.get_attribute("aria-pressed") or "").lower() == "true":
+        return True                      # already open; toggling would close it
+    btn.click()
+    return True
 
 
 RANKING_URL = "https://leetcode.com/contest/{slug}/ranking/{page}?region=global_v2"
@@ -96,28 +110,73 @@ def ensure_ranking_page(session, contest_slug, ui_page=1):
                               page="" if ui_page <= 1 else f"{ui_page}/")
     if session.page.url.split("#")[0] != want:
         session.page.goto(want, wait_until="domcontentloaded")
-        session.page.wait_for_selector("tr", timeout=20_000)
+    # Wait for the grid itself, not for a <tr> that never exists.
+    session.page.wait_for_selector('a[href^="/u/"]', timeout=20_000)
 
 
-def events(session, contest_slug, username, question_index, ui_page=1,
-           timeout_ms=15_000):
+def find_row(page, username, timeout_ms=15_000):
+    """The row container for one contestant, located via their profile link."""
+    link = page.locator(f'a[href="/u/{username}/"]').first
+    link.wait_for(timeout=timeout_ms)
+    return link.locator(ROW_FROM_LINK)
+
+
+def problem_cell(row, question_index, problem_count):
+    """The cell for one problem. Problem cells are the row's last N children."""
+    cells = row.locator("> div")
+    offset = cells.count() - problem_count
+    if offset < 0 or question_index >= problem_count:
+        return None
+    return cells.nth(offset + question_index)
+
+
+def events(session, contest_slug, username, question_index, problem_count=4,
+           ui_page=1, timeout_ms=15_000, attempts=3):
     """Scrape one submission's Code Replay event history.
 
     Returns the parsed event list, or None when the submission has no replay.
+
+    Opening the modal and rendering the panel is timing-sensitive, and an
+    occasional attempt comes back empty even though the data is there. Since an
+    empty result silently looks like "nothing suspicious", retry before
+    accepting it.
     """
+    for attempt in range(attempts):
+        got = _events_once(session, contest_slug, username, question_index,
+                           problem_count, ui_page, timeout_ms)
+        if got:
+            return got
+        session.page.wait_for_timeout(700)
+    return None
+
+
+def _events_once(session, contest_slug, username, question_index, problem_count,
+                 ui_page, timeout_ms):
     ensure_ranking_page(session, contest_slug, ui_page)
     page = session.page
-    row = page.locator("tr", has=page.get_by_role("link", name=username)).first
-    row.wait_for(timeout=timeout_ms)
-
-    cells = row.locator("td")
-    # The first columns are rank / name / score / finish time; problems follow.
-    offset = cells.count() - _problem_count(page)
-    cell = cells.nth(offset + question_index)
-    icon = cell.locator("button, svg, a").last
+    # A modal left open by the previous submission would swallow the next
+    # click, so make sure the board is actually reachable first.
+    _close(page)
+    row = find_row(page, username, timeout_ms)
+    cell = problem_cell(row, question_index, problem_count)
+    if cell is None:
+        return None
+    # The replay control is the rightmost icon in the cell.
+    icon = cell.locator("svg").last
     if not icon.count():
         return None
-    icon.click()
+
+    # A click can be swallowed while the previous modal is still animating out,
+    # leaving no dialog at all. Retry once before giving up on the submission.
+    for attempt in range(2):
+        icon.click()
+        try:
+            page.wait_for_selector("div[role='dialog']", timeout=6_000)
+            break
+        except Exception:
+            if attempt:
+                return None
+            page.wait_for_timeout(1_000)
 
     page.wait_for_selector("text=Code Replay", timeout=timeout_ms)
     _open_event_list(page)
@@ -132,14 +191,34 @@ def events(session, contest_slug, username, question_index, ui_page=1,
     return parse_rows(r.replace("\n", " | ") for r in rows)
 
 
-def _problem_count(page):
-    """Number of problem columns, read from the ranking table header."""
-    heads = page.locator("thead th, tr:first-child th").all_inner_texts()
-    return sum(1 for h in heads if re.match(r"^Q\d", h.strip())) or 4
-
-
 def _close(page):
+    """Close the replay modal and wait until it is really gone."""
+    if not page.locator("div[role='dialog']").count():
+        return
     page.keyboard.press("Escape")
+    try:
+        page.wait_for_function(
+            "() => !document.querySelector('div[role=\'dialog\']')",
+            timeout=5_000)
+    except Exception:
+        pass
+
+
+def _wait_container(page, timeout_ms):
+    """Wait for the Event History rows to render, then return the container."""
+    try:
+        page.wait_for_function(
+            """(sel) => {
+                for (const e of document.querySelectorAll(sel)) {
+                    if (/Submit Code|Input|External Paste|Run Code/.test(e.innerText || ''))
+                        return true;
+                }
+                return false;
+            }""",
+            arg=EVENT_LIST, timeout=timeout_ms)
+    except Exception:
+        return None
+    return _event_container(page)
 
 
 # --- plain REST helpers ---------------------------------------------------
