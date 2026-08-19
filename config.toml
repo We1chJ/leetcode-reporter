@@ -1,0 +1,46 @@
+# LeetCode Contest Auto-Reporter configuration.
+
+[safety]
+# Master switch. When true the full pipeline runs and reports are composed and
+# stored, but nothing is ever submitted to LeetCode. Ship default is true.
+dry_run = true
+# Refuse to file more than this many reports in a single contest scan.
+max_reports_per_contest = 10
+# Minimum seconds between two report submissions.
+min_seconds_between_reports = 45
+
+[scope]
+# Leaderboard rank range to scan (inclusive, 1-based).
+rank_start = 1
+rank_end = 100
+# Which contest problems to inspect. Empty list means all of them.
+questions = []
+# Seconds to wait between ranking/replay requests.
+request_delay = 1.0
+
+[detect]
+# Score at or above which a submission is reported without asking the model.
+cheat_threshold = 0.95
+# Score at or above which an ambiguous submission is sent to Claude to adjudicate.
+grey_low = 0.55
+# Solving every problem within this many seconds of each other. Corroborates
+# LeetCode's flag; never reports on its own (see core/detector.py).
+sweep_span_seconds = 120
+# Require LeetCode's own not_enough_activities flag before reporting at all.
+# Leaving this true means speed alone never files a report; it can only
+# corroborate LeetCode's flag or route a case to the model for adjudication.
+require_leetcode_flag = true
+
+[ai]
+model = "claude-opus-5"
+effort = "high"
+# Set false to fall back to hard-coded template narratives with no API calls.
+enabled = true
+
+[browser]
+# Persistent Chrome profile. Log in to LeetCode by hand once; the session is reused.
+user_data_dir = "data/chrome-profile"
+headless = false
+
+[paths]
+database = "data/reporter.db"

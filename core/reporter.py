@@ -1,0 +1,62 @@
+"""Drives LeetCode's "Report Cheating" dialog.
+
+There is no documented report API, so this is UI automation. Selectors are
+text/role based rather than class based, since LeetCode's generated class names
+churn. Confirm them against a live dialog with `python -m tools.discover`.
+
+In dry-run mode the browser never navigates and nothing is sent; the composed
+narrative is still persisted by the caller.
+"""
+
+import time
+
+from core.browser import BASE
+
+
+class ReportError(RuntimeError):
+    pass
+
+
+def open_submission(session, contest_slug, username, question_index):
+    """Open the ranking page for a contestant and click into their submission.
+
+    question_index is 0-based across the contest's problems.
+    """
+    page = session.page
+    page.goto(f"{BASE}/contest/{contest_slug}/ranking/?region=global",
+              wait_until="domcontentloaded")
+    row = page.locator("tr", has=page.get_by_role("link", name=username)).first
+    row.wait_for(timeout=20_000)
+    icons = row.locator("td a[href*='submission'], td svg").all()
+    if question_index >= len(icons):
+        raise ReportError(
+            f"{username}: no submission cell at index {question_index}")
+    icons[question_index].click()
+    page.get_by_text("Report Cheating", exact=False).first.wait_for(timeout=20_000)
+
+
+def submit_report(session, narrative, dry_run=True):
+    """Fill and submit the open Report Cheating dialog."""
+    page = session.page
+    page.get_by_text("Report Cheating", exact=False).first.click()
+    box = page.locator("textarea").last
+    box.wait_for(timeout=15_000)
+    box.fill(narrative)
+
+    if dry_run:
+        page.keyboard.press("Escape")
+        return "dry_run"
+
+    page.get_by_role("button", name="Submit", exact=False).last.click()
+    time.sleep(2)
+    return "submitted"
+
+
+def file_report(session, *, contest_slug, username, question_index, narrative,
+                dry_run=True):
+    """Full report flow for one submission. Returns the outcome string."""
+    if dry_run:
+        # Never touch the network in dry-run; the narrative is already persisted.
+        return "dry_run"
+    open_submission(session, contest_slug, username, question_index)
+    return submit_report(session, narrative, dry_run=False)

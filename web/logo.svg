@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"
+     role="img" aria-label="Contest Reporter">
+  <defs>
+    <!-- Keep the code marks inside the lens. -->
+    <clipPath id="lens">
+      <circle cx="26" cy="26" r="14"/>
+    </clipPath>
+  </defs>
+
+  <!-- tile -->
+  <rect width="64" height="64" rx="15" fill="#16181d"/>
+
+  <!-- lens interior -->
+  <circle cx="26" cy="26" r="14" fill="#0d0f13"/>
+
+  <g clip-path="url(#lens)">
+    <!-- typed code: thin, ragged, indented -->
+    <g fill="#6b7482">
+      <rect x="14" y="15" width="16" height="3" rx="1.5"/>
+      <rect x="18" y="20.5" width="10" height="3" rx="1.5"/>
+    </g>
+    <!-- the pasted block: one solid slab, arriving whole. Sized to leave dark
+         lens around it; filling the lens made the mark read as a solid dot. -->
+    <rect x="13" y="27.5" width="26" height="9" rx="2" fill="#ffa116"/>
+  </g>
+
+  <!-- lens rim + handle -->
+  <circle cx="26" cy="26" r="14" fill="none" stroke="#ffa116" stroke-width="4"/>
+  <path d="M36.5 36.5 L51 51" stroke="#ffa116" stroke-width="6" stroke-linecap="round"/>
+</svg>

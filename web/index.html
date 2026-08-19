@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeetCode Contest Reporter</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <img src="/static/logo.svg" alt="" width="26" height="26">
+  <h1>Contest Reporter</h1>
+  <span id="mode" class="pill">…</span>
+</header>
+
+<section class="controls">
+  <input id="slug" placeholder="weekly-contest-450" autocomplete="off">
+  <button id="scan">Scan contest</button>
+  <button id="stop" class="danger">Stop</button>
+  <span id="status"></span>
+</section>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="log">Live log</button>
+  <button class="tab" data-tab="offenders">Offenders</button>
+  <button class="tab" data-tab="reports">Reports</button>
+  <button class="tab" data-tab="scans">Scans</button>
+</nav>
+
+<main>
+  <div id="log" class="panel active"><pre id="logbody"></pre></div>
+  <div id="offenders" class="panel"></div>
+  <div id="reports" class="panel"></div>
+  <div id="scans" class="panel"></div>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

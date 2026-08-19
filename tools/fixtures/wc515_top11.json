@@ -1,0 +1,25 @@
+{
+  "_comment": "Live capture from weekly-contest-515, top 11 ranks, 2026-08-18. Rows are [rank, username, [[question_id, seconds_after_start, credit, not_enough_activities, fail_count], ...]].",
+  "slug": "weekly-contest-515",
+  "start_time": 1786847400,
+  "duration": 5400,
+  "questions": [
+    {"question_id": 4378, "title_slug": "nearest-available-drone", "credit": 3},
+    {"question_id": 4375, "title_slug": "minimize-the-maximum-waiting-time-at-synchronized-traffic-lights", "credit": 4},
+    {"question_id": 4034, "title_slug": "maximum-gap-between-stations", "credit": 5},
+    {"question_id": 4386, "title_slug": "elevator-requests-iii", "credit": 6}
+  ],
+  "rows": [
+    [1, "NBLtheGuy", [[4034,110,5,0,0],[4375,123,4,0,0],[4378,64,3,1,0],[4386,140,6,0,0]]],
+    [2, "CONTEST_TESTER_X718", [[4034,153,5,0,0],[4375,96,4,0,0],[4378,49,3,0,0],[4386,228,6,1,0]]],
+    [3, "Nikhil_jaiswal_18", [[4034,149,5,0,0],[4375,107,4,0,0],[4378,54,3,0,0],[4386,231,6,0,0]]],
+    [4, "faratedar-user", [[4034,159,5,0,0],[4375,100,4,0,0],[4378,56,3,0,0],[4386,240,6,0,0]]],
+    [5, "sheikhzee777", [[4034,273,5,0,0],[4375,249,4,0,0],[4378,222,3,0,0],[4386,306,6,0,0]]],
+    [6, "Fareedh7", [[4034,235,5,0,0],[4375,168,4,0,0],[4378,79,3,0,0],[4386,322,6,0,0]]],
+    [7, "turtlemanman", [[4034,244,5,0,0],[4375,228,4,0,0],[4378,354,3,0,0],[4386,341,6,0,0]]],
+    [8, "frosty-lederberg", [[4034,255,5,0,0],[4375,176,4,0,0],[4378,121,3,0,0],[4386,388,6,0,0]]],
+    [9, "satya6608", [[4034,281,5,1,0],[4375,222,4,1,0],[4378,156,3,1,0],[4386,389,6,0,0]]],
+    [10, "pushpanjali91", [[4034,236,5,0,0],[4375,170,4,0,0],[4378,78,3,0,0],[4386,403,6,0,0]]],
+    [11, "Garykaspov", [[4034,339,5,0,0],[4375,268,4,1,0],[4378,183,3,0,0],[4386,404,6,0,0]]]
+  ]
+}
