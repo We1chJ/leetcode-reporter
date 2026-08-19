@@ -34,19 +34,43 @@ def open_submission(session, contest_slug, username, question_index,
     page.get_by_text("Report Cheating", exact=False).first.wait_for(timeout=20_000)
 
 
+def open_report_form(page, timeout_ms=15_000):
+    """Click "Report Cheating" and wait for its textarea.
+
+    The replay modal lays a full-screen overlay over the page, which swallows a
+    normal click, so fall back to dispatching the click directly on the element.
+    """
+    ctl = page.get_by_text("Report Cheating", exact=False).first
+    ctl.wait_for(timeout=timeout_ms)
+    try:
+        ctl.click(timeout=5_000)
+    except Exception:
+        ctl.evaluate("el => el.click()")
+    box = page.locator("textarea").last
+    box.wait_for(timeout=timeout_ms)
+    return box
+
+
 def submit_report(session, narrative, dry_run=True):
     """Fill and submit the open Report Cheating dialog."""
     page = session.page
-    page.get_by_text("Report Cheating", exact=False).first.click()
-    box = page.locator("textarea").last
-    box.wait_for(timeout=15_000)
+    box = open_report_form(page)
     box.fill(narrative)
+
+    written = box.input_value()
+    if written.strip() != narrative.strip():
+        raise ReportError(
+            f"report text did not land in the form "
+            f"({len(written)} of {len(narrative)} characters)")
 
     if dry_run:
         page.keyboard.press("Escape")
         return "dry_run"
 
-    page.get_by_role("button", name="Submit", exact=False).last.click()
+    submit = page.get_by_role("button", name="Submit", exact=False).last
+    if not submit.count():
+        raise ReportError("no Submit button in the report dialog")
+    submit.click()
     time.sleep(2)
     return "submitted"
 

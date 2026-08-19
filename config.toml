@@ -5,14 +5,14 @@
 # stored, but nothing is ever submitted to LeetCode. Ship default is true.
 dry_run = true
 # Refuse to file more than this many reports in a single contest scan.
-max_reports_per_contest = 10
+max_reports_per_contest = 400
 # Minimum seconds between two report submissions.
 min_seconds_between_reports = 45
 
 [scope]
 # Leaderboard rank range to scan (inclusive, 1-based).
 rank_start = 1
-rank_end = 8
+rank_end = 100
 # Which contest problems to inspect. Empty list means all of them.
 questions = []
 # Seconds to wait between ranking/replay requests.
