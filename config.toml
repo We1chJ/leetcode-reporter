@@ -32,6 +32,13 @@ burst_fraction = 0.60
 # How many separate points in the timeline the code must grow at to count as
 # having been written progressively.
 min_growth_steps = 2
+# Growth other than the single biggest jump, as a fraction of the peak, needed
+# before a submission counts as genuinely authored. Without this, a handful of
+# trivial edits masks a burst.
+authored_fraction = 0.30
+# Treat any external paste as reportable, regardless of size or what follows.
+# This also reports people who paste their own template.
+report_any_paste = true
 # Ignore trivially short solutions, where one step is meaningless.
 min_solution_chars = 200
 # Points sampled along the replay timeline.

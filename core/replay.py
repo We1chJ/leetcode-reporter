@@ -210,6 +210,12 @@ SAMPLE_SETTLE_MS = 260
 JS_CODE_CHARS = ("() => [...document.querySelectorAll('.cm-line')]"
                  ".reduce((n, l) => n + (l.innerText || '').length, 0)")
 
+# The player's "current / total" clock, used to confirm a seek actually moved.
+JS_PLAYHEAD = r"""() => {
+    const m = document.body.innerText.match(/(\d+:\d{2})\s*\/\s*(\d+:\d{2})/);
+    return m ? m[1] : null;
+}"""
+
 # The scrub track: the widest thin element in the lower part of the modal.
 # It is a plain div -- no <input type=range>, no role="slider".
 JS_TRACK = """() => {
@@ -285,12 +291,19 @@ def _read_progression(page, samples=PROGRESSION_SAMPLES):
     if not tr or tr["w"] < 50:
         return None
     y = tr["y"] + tr["h"] / 2
-    out = []
+    out, heads = [], []
     for i in range(samples):
         f = i / (samples - 1)
         page.mouse.click(tr["x"] + 2 + f * (tr["w"] - 4), y)
         page.wait_for_timeout(SAMPLE_SETTLE_MS)
         out.append(page.evaluate(JS_CODE_CHARS))
+        heads.append(page.evaluate(JS_PLAYHEAD))
+
+    # If the playhead never moved, the clicks did not seek and every sample is
+    # the same frame. That is a scrape failure, not evidence -- and it must not
+    # be mistaken for "the code never grew", which scores as a violation.
+    if len(set(h for h in heads if h is not None)) <= 1:
+        return None
     return out
 
 

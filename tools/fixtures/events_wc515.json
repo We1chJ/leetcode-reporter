@@ -86,13 +86,13 @@
       ]
     },
     {
-      "label": "control: small paste (own template), then long work and several runs",
+      "label": "own template pasted, then real work - reported by choice",
       "user": "template-user",
       "question": "control-template",
       "credit": 5,
       "seconds_after_start": 1500,
       "leetcode_flag": false,
-      "expect": "clean",
+      "expect": "cheat",
       "rows": [
         "Switch Language | 0:01 | C++",
         "External Paste | 0:14 | size 180 chars",
@@ -112,7 +112,8 @@
         610,
         680,
         742
-      ]
+      ],
+      "_note": "Under report_any_paste this is a violation. Deliberate: the operator chose to treat every external paste as reportable, accepting that pasting your own boilerplate is caught too."
     },
     {
       "label": "cheat: idle, then big paste, tab switch, second big paste, submit",
@@ -150,8 +151,8 @@
       "credit": 6,
       "seconds_after_start": 2400,
       "leetcode_flag": false,
-      "expect": "clean",
-      "_note": "Large paste up front, then real growth across the timeline. The growth curve distinguishes this from a pasted solution, which the event history alone could not.",
+      "expect": "cheat",
+      "_note": "Also reported under report_any_paste, though its growth curve alone would not have flagged it.",
       "rows": [
         "Switch Language | 0:01 | Python3",
         "External Paste | 0:30 | size > 500 chars | 🔴",
@@ -172,6 +173,62 @@
         1190,
         1240,
         1290
+      ]
+    },
+    {
+      "label": "REAL: goel0277 Q4 - five tiny edits then 939 chars at once",
+      "user": "goel0277",
+      "question": "elevator-requests-iii",
+      "credit": 6,
+      "seconds_after_start": 1900,
+      "leetcode_flag": false,
+      "expect": "cheat",
+      "_note": "Scored clean before authored_fraction existed: 5 growth steps totalling 43 chars.",
+      "rows": [
+        "Switch Language | 0:01 | Python3",
+        "Submit Code | 30:00 | Accepted | Details"
+      ],
+      "progression": [
+        108,
+        108,
+        108,
+        108,
+        108,
+        109,
+        140,
+        143,
+        151,
+        151,
+        151,
+        1090
+      ]
+    },
+    {
+      "label": "REAL honest: vinaypinagadi Q4 - steady growth across the timeline",
+      "user": "vinaypinagadi",
+      "question": "elevator-requests-iii",
+      "credit": 6,
+      "seconds_after_start": 2000,
+      "leetcode_flag": false,
+      "expect": "clean",
+      "rows": [
+        "Switch Language | 0:01 | C++",
+        "Run Code | 20:00 | Accepted | Details",
+        "Submit Code | 25:00 | Accepted | Details"
+      ],
+      "progression": [
+        159,
+        159,
+        159,
+        159,
+        309,
+        547,
+        676,
+        1077,
+        1530,
+        1655,
+        1667,
+        1667
       ]
     }
   ]

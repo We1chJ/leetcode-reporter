@@ -32,6 +32,7 @@ from core import config
 from core.replay import PAGE_SWITCH, PASTE, RUN, SUBMIT
 
 # --- reason codes ---------------------------------------------------------
+EXTERNAL_PASTE_PRESENT = "EXTERNAL_PASTE_PRESENT"
 CODE_APPEARS_IN_ONE_STEP = "CODE_APPEARS_IN_ONE_STEP"
 NO_INCREMENTAL_PROGRESS = "NO_INCREMENTAL_PROGRESS"
 LARGE_PASTE_THEN_SUBMIT = "LARGE_PASTE_THEN_SUBMIT"
@@ -43,6 +44,9 @@ IMPLAUSIBLE_SOLVE_SPEED = "IMPLAUSIBLE_SOLVE_SPEED"
 # Phrased strictly in terms of what the event history records. None of these may
 # assert anything about typing, which the history does not capture.
 REASON_TEXT = {
+    EXTERNAL_PASTE_PRESENT:
+        "the Code Replay records an external paste - code brought into the "
+        "editor from outside it rather than written in place",
     CODE_APPEARS_IN_ONE_STEP:
         "stepping through the Code Replay shows the editor essentially empty "
         "and then, in a single step of the timeline, holding the complete "
@@ -85,6 +89,10 @@ def summarise_progression(prog):
     steps = [prog[i + 1] - prog[i] for i in range(len(prog) - 1)]
     growth = [d for d in steps if d > 0]
     biggest = max(steps) if steps else 0
+    # Growth apart from the single largest jump. Counting bare increments was
+    # not enough: goel0277's Q4 grew at five points totalling 43 characters and
+    # then gained 939 in one step, which the step count alone called authoring.
+    other_growth = sum(growth) - biggest if growth else 0
     return {
         "samples": len(prog),
         # Peak and end differ when code is pasted and then trimmed back down,
@@ -97,6 +105,9 @@ def summarise_progression(prog):
         # one step of the timeline. Near 1.0 means it was never written here.
         "biggest_jump_fraction": round(biggest / peak, 3) if peak else 0.0,
         "growth_steps": len(growth),
+        "growth_excluding_jump_chars": max(other_growth, 0),
+        "growth_excluding_jump_fraction":
+            round(max(other_growth, 0) / peak, 3) if peak else 0.0,
         "curve": prog,
     }
 
@@ -173,7 +184,10 @@ def analyse(events, sub, ctx):
     if prog:
         g = summarise_progression(prog)
         evidence.update(g)
-        authored = g["growth_steps"] > d["min_growth_steps"]
+        # Authoring means the code grew substantially by means other than the
+        # one big jump -- not merely that it changed at several points.
+        authored = (g["growth_steps"] > d["min_growth_steps"] and
+                    g["growth_excluding_jump_fraction"] >= d["authored_fraction"])
         evidence["shows_ongoing_authoring"] = authored
         if g["peak_chars"] >= d["min_solution_chars"] and not authored:
             if g["biggest_jump_fraction"] >= d["burst_fraction"]:
@@ -181,9 +195,18 @@ def analyse(events, sub, ctx):
             else:
                 reasons.append((NO_INCREMENTAL_PROGRESS, 0.94))
 
-    if events and not authored:
+    if events:
         s = summarise(events)
         evidence.update(s)
+
+        # Any external paste at all counts. Honest contestants in the control
+        # sample had none; the cost of this rule is that pasting your own
+        # template or library is also reported.
+        if s["paste_events"] and d["report_any_paste"]:
+            reasons.append((EXTERNAL_PASTE_PRESENT, 0.96))
+
+    if events and not authored:
+        s = summarise(events)
         big = s["largest_paste_chars"] >= d["large_paste_chars"]
         gap = None
         if s["last_paste_t"] is not None and s["submit_t"] is not None:
