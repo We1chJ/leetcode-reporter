@@ -21,6 +21,14 @@ h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
   letter-spacing: .05em; text-transform: uppercase; font-weight: 600;
 }
 .pill.live { background: #3a1416; color: var(--danger); border-color: #6b2427; }
+/* The pill is a button now. These need to outweigh the generic button rules,
+   which set their own background and hover, hence the button.pill prefix. */
+button.pill { cursor: pointer; line-height: 1.5; }
+button.pill:hover:not(:disabled) { background: #4a3614; }
+button.pill.live:hover:not(:disabled) { background: #4d1a1d; }
+/* Armed: dressed as live before it is live, so the next click is no surprise. */
+button.pill.arm { background: #4d1a1d; color: var(--danger); border-color: #6b2427; }
+button.pill:disabled { opacity: .55; cursor: default; }
 
 /* --- controls ---------------------------------------------------------- */
 .controls { display: flex; gap: 10px; align-items: flex-end; padding: 16px 22px 0;

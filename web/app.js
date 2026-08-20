@@ -15,6 +15,7 @@ let scope = { rank_start: 1, rank_end: 100 };
 let scanning = false;
 let paused = false;
 let setupReady = false;
+let dryRun = true;
 
 const totalRanks = () => Math.max(0, scope.rank_end - scope.rank_start + 1);
 
@@ -72,19 +73,65 @@ es.onmessage = (m) => {
 
 function setRunning(on) {
   const haveSlug = !!$("#slug").value.trim();
+  // Every lookup is null-checked. A stale cached page once served an old
+  // index.html against a new app.js: the missing button threw here, and the
+  // throw took the whole handler down with it -- including Stop. The controls
+  // that end a scan must degrade one at a time, never all at once.
+  const stop = $("#stop"), pause = $("#pause"), scan = $("#scan");
   // Stop and Pause stay live for the whole run: they are the only way out of
   // a scan, so they must never be the thing that is disabled.
-  $("#stop").disabled = !on;
-  $("#stop").textContent = "Stop";
-  $("#pause").disabled = !on;
-  $("#pause").textContent = paused ? "Resume" : "Pause";
-  $("#pause").classList.toggle("primary", paused && on);
-  $("#scan").disabled = on || !setupReady || !haveSlug;
-  $("#scan").textContent = on ? (paused ? "Paused" : "Scanning…") : "Start scanning";
+  if (stop) { stop.disabled = !on; stop.textContent = "Stop"; }
+  if (pause) {
+    pause.disabled = !on;
+    pause.textContent = paused ? "Resume" : "Pause";
+    pause.classList.toggle("primary", paused && on);
+  }
+  if (scan) {
+    scan.disabled = on || !setupReady || !haveSlug;
+    scan.textContent = on ? (paused ? "Paused" : "Scanning…") : "Start scanning";
+  }
   $("#blocked").textContent = on ? ""
     : !setupReady ? "Finish setup to scan."
     : !haveSlug ? "Enter a contest number." : "";
+  showMode();
 }
+
+// --- dry run / live ------------------------------------------------------
+// Going live is the consequential direction -- every later scan files real
+// reports against real people -- so that way takes two clicks. Going back to
+// dry run is harmless and takes one.
+let armLive = false;
+
+function showMode() {
+  const el = $("#mode");
+  if (!el) return;
+  el.textContent = armLive ? "click to confirm" : dryRun ? "dry run" : "live";
+  el.className = "pill" + (dryRun ? "" : " live") + (armLive ? " arm" : "");
+  el.disabled = scanning;
+  el.title = scanning
+    ? "A scan is running. It keeps the mode it started with."
+    : dryRun
+      ? "Dry run: reports are composed and stored, never sent. Click to go live."
+      : "Live: every scan files reports to LeetCode. Click for dry run.";
+}
+
+if ($("#mode")) $("#mode").onclick = async () => {
+  if (scanning) return;
+  if (dryRun && !armLive) {             // arm, do not switch yet
+    armLive = true;
+    showMode();
+    setTimeout(() => { if (armLive) { armLive = false; showMode(); } }, 4000);
+    return;
+  }
+  armLive = false;
+  const r = await (await fetch(`/api/mode?dry_run=${!dryRun}`,
+                               { method: "POST" })).json();
+  if (!r.ok) return line(r.error, "error");
+  dryRun = r.dry_run;
+  line(dryRun ? "Switched to DRY RUN - nothing will be submitted."
+              : "Switched to LIVE - scans will file reports to LeetCode.", "warn");
+  refresh();
+};
 
 // --- controls ------------------------------------------------------------
 $("#scan").onclick = async () => {
@@ -100,7 +147,7 @@ $("#stop").onclick = () => {
   $("#stop").textContent = "Stopping…";
   fetch("/api/stop", { method: "POST" });
 };
-$("#pause").onclick = async () => {
+if ($("#pause")) $("#pause").onclick = async () => {
   // Optimistic: the button answers at once, the scan catches up at the next
   // step boundary. The state event puts it right either way.
   const want = !paused;
@@ -219,8 +266,8 @@ async function refresh() {
   }
   if (!scanning) scope = cfg.scope;
   const dry = cfg.safety.dry_run;
-  $("#mode").textContent = dry ? "dry run" : "live";
-  $("#mode").className = "pill" + (dry ? "" : " live");
+  dryRun = dry;
+  showMode();
   if (!scanning) showProgress();
 
   // Every number is counted from the stored rows, so a stopped or failed scan
