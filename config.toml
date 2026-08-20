@@ -74,7 +74,7 @@ inspect_all_replays = true
 #            itself as automated and sign-in verification tends to refuse it.
 mode = "attach"
 cdp_url = "http://127.0.0.1:9222"
-# Profile directory, used by start_chrome.bat and by launch mode. Kept separate
+# Profile directory, used by the start_chrome launcher and by launch mode. Kept separate
 # from your everyday Chrome profile.
 user_data_dir = "data/chrome-profile"
 headless = false

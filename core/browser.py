@@ -10,7 +10,8 @@ Two modes, set by `browser.mode` in config.toml:
       --remote-debugging-port. Playwright never launches the browser, so it is
       an ordinary Chrome: no automation flags, no navigator.webdriver. You sign
       in by hand in that window like any other browsing session, and the tool
-      simply reuses it. Start it with start_chrome.bat.
+      simply reuses it. Start it with start_chrome.bat (start_chrome.sh on
+      macOS and Linux).
 
   launch
       Let Playwright start its own Chrome against a private profile. Simpler,
@@ -57,7 +58,7 @@ class Session:
         except Exception as exc:
             raise NoBrowserError(
                 f"Could not attach to Chrome at {self.cdp_url}. Start it with "
-                f"start_chrome.bat (or run Chrome with "
+                f"start_chrome.bat / start_chrome.sh (or run Chrome with "
                 f"--remote-debugging-port=9222), sign in to LeetCode there, "
                 f"and leave the window open. Original error: {exc}"
             ) from exc

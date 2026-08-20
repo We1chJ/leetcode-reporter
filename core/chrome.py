@@ -9,6 +9,7 @@ to see that and offer to start it.
 
 import json
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -18,11 +19,26 @@ from core import config
 
 LOGIN_URL = "https://leetcode.com/accounts/login/"
 
-CANDIDATES = [
-    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-    str(Path.home() / r"AppData\Local\Google\Chrome\Application\chrome.exe"),
-]
+# Where Chrome installs itself, per platform. macOS puts the executable inside
+# the .app bundle; the bundle path itself is not runnable.
+CANDIDATES = {
+    "win32": [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        str(Path.home() / r"AppData\Local\Google\Chrome\Application\chrome.exe"),
+    ],
+    "darwin": [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        str(Path.home() / "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+    ],
+    "linux": [
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/snap/bin/chromium",
+    ],
+}
 
 
 def _port():
@@ -34,7 +50,8 @@ def _profile():
 
 
 def chrome_path():
-    for c in CANDIDATES:
+    platform = "linux" if sys.platform.startswith("linux") else sys.platform
+    for c in CANDIDATES.get(platform, []):
         if Path(c).exists():
             return c
     return None
@@ -77,11 +94,15 @@ def start(wait_seconds=15):
     profile.mkdir(parents=True, exist_ok=True)
     port = _port().rsplit(":", 1)[-1]
 
+    # Detach so Chrome outlives the server process. The mechanism differs by
+    # platform: creationflags exists only on Windows, start_new_session only on
+    # POSIX, and passing the wrong one raises.
+    detach = ({"creationflags": subprocess.DETACHED_PROCESS}
+              if sys.platform == "win32" else {"start_new_session": True})
     subprocess.Popen(
         [exe, f"--remote-debugging-port={port}",
          f"--user-data-dir={profile}", LOGIN_URL],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **detach,
     )
 
     deadline = time.time() + wait_seconds
