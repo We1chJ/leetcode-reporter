@@ -1,9 +1,9 @@
 # LeetCode Contest Auto-Reporter configuration.
 
 [safety]
-# Master switch. When true the full pipeline runs and reports are composed and
-# stored, but nothing is ever submitted to LeetCode. Ship default is true.
-dry_run = true
+# Master switch. false = live: every scan files its reports to LeetCode.
+# Set to true only if you want reports composed and stored but never submitted.
+dry_run = false
 # Refuse to file more than this many reports in a single contest scan.
 max_reports_per_contest = 400
 # Minimum seconds between two report submissions.
