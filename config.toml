@@ -3,11 +3,17 @@
 [safety]
 # Master switch. false = live: every scan files its reports to LeetCode.
 # Set to true only if you want reports composed and stored but never submitted.
-dry_run = false
+dry_run = true
 # Refuse to file more than this many reports in a single contest scan.
 max_reports_per_contest = 400
 # Minimum seconds between two report submissions.
-min_seconds_between_reports = 45
+#
+# Self-imposed, not a limit LeetCode publishes or that anything here has ever
+# measured: no 429 and no block has been observed at any rate. The only rate
+# with evidence behind it is ~49s, which filed 72 reports without a failure.
+# It is a choice about how conspicuous a run looks, not a technical ceiling.
+# Reports are filed under your own account and name each accused contestant.
+min_seconds_between_reports = 20
 
 [scope]
 # Leaderboard rank range to scan (inclusive, 1-based).
