@@ -1,8 +1,8 @@
-"""Clear the lifetime counters and the local report log.
+"""Clear the local findings log and scan history.
 
-The counters accumulated across several detector revisions, including two that
-were wrong, so the totals do not describe the current rules. This resets them
-so "reports sent" counts only what was actually filed from here on.
+The totals on the dashboard are counted from these rows, so emptying them puts
+every number back to zero. Use it to start a contest fresh, or after a detector
+change makes older verdicts no longer describe the current rules.
 
 Does not touch anything on LeetCode. Reports already filed there stay filed,
 and the duplicate check still consults LeetCode directly, so clearing the local
@@ -25,12 +25,11 @@ def main():
     conn = store.connect()
     try:
         before = store.stats(conn)
-        n_reports = len(store.reports(conn, 100_000))
-        conn.execute("DELETE FROM stats")
+        n_reports = conn.execute("SELECT COUNT(*) FROM reports").fetchone()[0]
         conn.execute("DELETE FROM reports")
         conn.execute("DELETE FROM scans")
         conn.commit()
-        print(f"cleared {n_reports} local report rows and the scan history")
+        print(f"cleared {n_reports} finding row(s) and the scan history")
         print(f"  before: {before}")
         print(f"  after:  {store.stats(conn)}")
     finally:

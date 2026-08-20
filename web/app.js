@@ -23,7 +23,8 @@ es.onmessage = (m) => {
     line(`REPORT ${ev.user} / ${ev.question} — ${ev.reason} (${ev.score}) → ${ev.outcome}`, "good");
     refresh();
   } else if (ev.type === "scan_end") {
-    line(`Scan ${ev.status}: ${ev.scanned} scanned, ${ev.flagged} flagged, ${ev.reported} reported`, "warn");
+    line(`Scan ${ev.status}: ${ev.scanned} contestants, ${ev.inspected} submissions inspected, ` +
+         `${ev.flagged} flagged, ${ev.reported} reported`, "warn");
     $("#status").textContent = "";
     refresh();
   }
@@ -139,11 +140,14 @@ async function refresh() {
   $("#mode").className = "pill" + (dry ? "" : " live");
 
   const st = await (await fetch("/api/stats")).json();
+  // Every number here is counted from the stored rows, so a stopped or failed
+  // scan adds nothing and rescanning a contest does not inflate anything.
   $("#stats").innerHTML = [
     ["Caught", st.cheating_submissions_caught, "big"],
     ["Reports sent", st.reports_submitted, dry ? "muted" : ""],
     ["Suspicious", st.suspicious_recorded],
-    ["Submissions scanned", st.submissions_scanned],
+    ["Contestants scanned", st.contestants_scanned],
+    ["Submissions inspected", st.submissions_scanned],
     ["Contests scanned", st.contests_scanned],
   ].map(([label, value, cls]) =>
     `<div class="stat ${cls || ""}"><span class="n">${value ?? 0}</span>` +
@@ -181,7 +185,8 @@ async function refresh() {
   $("#scans").innerHTML = table(await (await fetch("/api/scans")).json(), [
     ["contest_slug", "Contest"],
     ["started_at", "Started", when],
-    ["ranks_scanned", "Scanned"],
+    ["ranks_scanned", "Contestants"],
+    ["submissions_seen", "Inspected"],
     ["flagged", "Flagged"],
     ["reported", "Reported"],
     ["status", "Status", badge],

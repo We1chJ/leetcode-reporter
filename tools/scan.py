@@ -24,8 +24,9 @@ def emit(ev):
     elif t == "scan_start":
         print(f"== scan {ev['contest']}  dry_run={ev['dry_run']}", flush=True)
     elif t == "scan_end":
-        print(f"== {ev['status']}: scanned={ev['scanned']} "
-              f"flagged={ev['flagged']} reported={ev['reported']}", flush=True)
+        print(f"== {ev['status']}: contestants={ev['scanned']} "
+              f"inspected={ev['inspected']} flagged={ev['flagged']} "
+              f"reported={ev['reported']}", flush=True)
 
 
 def main():

@@ -32,7 +32,7 @@ class Pipeline:
         self._stop.clear()
         conn = store.connect()
         scan_id = store.start_scan(conn, contest_slug)
-        scanned = flagged = reported = 0
+        scanned = inspected = flagged = reported = 0
         last_report_at = 0.0
         status = "done"
 
@@ -66,7 +66,6 @@ class Pipeline:
                         status = "stopped"
                         break
                     scanned += 1
-                    store.bump(conn, store.SCANNED)
                     username = row["username"]
                     self.emit({"type": "progress", "rank": row["rank"], "user": username})
 
@@ -121,21 +120,29 @@ class Pipeline:
                                "question_slug": qslug,
                                "sweep_span": sweep,
                                "progression": ctx_progression}
+                        inspected += 1
                         verdict, score, reason, evidence = detector.analyse(evs, sub, ctx)
 
                         if verdict == detector.CLEAN:
                             continue
 
                         if verdict == detector.GREY:
-                            # Recorded for review, never auto-reported.
+                            # Recorded for review, never auto-reported. Stored
+                            # as a row so the total counts it once however many
+                            # times the contest is rescanned.
                             flagged += 1
-                            store.bump(conn, store.SUSPICIOUS)
+                            store.record_report(
+                                conn, username=username, contest_slug=contest_slug,
+                                question_slug=ctx["question_slug"], submission_id=sub_id,
+                                reason_code=reason, score=score, evidence=evidence,
+                                narrative=report_text.generate(
+                                    username, contest_slug, ctx["question_slug"],
+                                    reason, evidence),
+                                dry_run=dry_run, verdict=store.GREY)
                             self.emit({"type": "log",
                                        "msg": f"{username} {ctx['question_slug']}: "
                                               f"grey ({score}) {reason} - not reported"})
                             continue
-
-                        store.bump(conn, store.CAUGHT)
 
                         if reported >= safety["max_reports_per_contest"]:
                             self.emit({"type": "log", "level": "warn",
@@ -181,8 +188,6 @@ class Pipeline:
 
                         last_report_at = time.time()
                         reported += 1
-                        if outcome == "submitted":
-                            store.bump(conn, store.REPORTED)
                         self.emit({"type": "report", "user": username,
                                    "question": ctx["question_slug"], "reason": reason,
                                    "score": score, "outcome": outcome})
@@ -190,9 +195,10 @@ class Pipeline:
             status = "error"
             self.emit({"type": "log", "level": "error", "msg": f"scan failed: {exc}"})
         finally:
-            store.bump(conn, store.CONTESTS)
-            store.finish_scan(conn, scan_id, scanned, flagged, reported, status)
+            store.finish_scan(conn, scan_id, scanned, inspected, flagged,
+                              reported, status)
             conn.close()
             self.running = False
             self.emit({"type": "scan_end", "status": status, "scanned": scanned,
-                       "flagged": flagged, "reported": reported})
+                       "inspected": inspected, "flagged": flagged,
+                       "reported": reported})
