@@ -3,7 +3,7 @@
 [safety]
 # Master switch. false = live: every scan files its reports to LeetCode.
 # Set to true only if you want reports composed and stored but never submitted.
-dry_run = true
+dry_run = false
 # Refuse to file more than this many reports in a single contest scan.
 max_reports_per_contest = 400
 # Minimum seconds between two report submissions.
