@@ -9,46 +9,44 @@
 </head>
 <body>
 <header>
-  <img src="/static/logo.svg" alt="" width="28" height="28">
+  <img src="/static/logo.svg" alt="" width="26" height="26">
   <h1>Contest Reporter</h1>
   <span id="mode" class="pill">…</span>
-  <span class="spacer"></span>
-  <span id="status" class="dim"></span>
 </header>
 
-<!-- What must be true before a scan can run. Reflects live state. -->
+<!-- What must be true before a scan can run. Stays up until it is. -->
 <section id="setup" class="setup"></section>
+
+<section class="controls">
+  <input id="slug" placeholder="515" title="Contest number, or a full slug" autocomplete="off">
+  <button id="scan" class="primary">Start scanning</button>
+  <button id="stop" class="danger" disabled>Stop</button>
+  <span id="blocked" class="dim"></span>
+</section>
+
+<!-- How far along a scan is, and how far it intends to go. -->
+<section id="progress" class="progress"></section>
 
 <section class="stats" id="stats"></section>
 
-<section class="controls">
-  <input id="slug" placeholder="515  or  weekly-contest-515" title="Contest number or full slug" autocomplete="off">
-  <button id="scan" class="primary">Scan contest</button>
-  <button id="stop" class="danger">Stop</button>
-</section>
+<main class="split">
+  <section class="results">
+    <nav class="tabs">
+      <button class="tab active" data-tab="users">Caught</button>
+      <button class="tab" data-tab="scans">Contests scanned</button>
+    </nav>
+    <div id="users" class="panel active"></div>
+    <div id="scans" class="panel"></div>
+  </section>
 
-<nav class="tabs">
-  <button class="tab active" data-tab="users">Contestants</button>
-  <button class="tab" data-tab="reports">Reports</button>
-  <button class="tab" data-tab="scans">Scans</button>
-  <button class="tab" data-tab="log">Live log</button>
-</nav>
-
-<main>
-  <div id="users" class="panel active"></div>
-  <div id="reports" class="panel"></div>
-  <div id="scans" class="panel"></div>
-  <div id="log" class="panel"><pre id="logbody"></pre></div>
+  <section class="logcard">
+    <div class="logcard-head">
+      <span>Live log</span>
+      <button id="clearlog" class="ghost">Clear</button>
+    </div>
+    <pre id="logbody"></pre>
+  </section>
 </main>
-
-<!-- Full report text, opened from a row in the Reports tab. -->
-<div id="drawer" class="drawer">
-  <div class="drawer-head">
-    <strong id="drawer-title"></strong>
-    <button id="drawer-close">Close</button>
-  </div>
-  <pre id="drawer-body"></pre>
-</div>
 
 <script src="/static/app.js"></script>
 </body>
