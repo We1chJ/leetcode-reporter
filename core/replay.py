@@ -139,6 +139,16 @@ def find_row(page, username, timeout_ms=15_000, rank=None, finish_offset=None):
     attribute a replay to the wrong person.
     """
     link = page.locator(f'a[href="/u/{username}/"]')
+    # The board renders progressively, so an immediate count of 0 does not mean
+    # this contestant has no link -- it may just not be painted yet. Give it a
+    # moment before dropping to the positional fallback, but not the full
+    # timeout: most of the link-less rows really are link-less, and waiting on
+    # every one of them would dominate a 100-rank scan.
+    if not link.count():
+        try:
+            link.first.wait_for(timeout=2_500)
+        except Exception:
+            pass
     if link.count():
         link.first.wait_for(timeout=timeout_ms)
         return link.first.locator(ROW_FROM_LINK)

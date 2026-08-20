@@ -9,8 +9,8 @@ function line(text, cls = "") {
   logbody.scrollTop = 1e9;
 }
 
-// Scan scope comes from config, so the page can say how many contestants a
-// scan covers before it starts.
+// The range a scan covers: seeded from config, replaced by what the running
+// scan reports so the count is always against what is really being scanned.
 let scope = { rank_start: 1, rank_end: 100 };
 let scanning = false;
 let setupReady = false;
@@ -21,9 +21,9 @@ const totalRanks = () => Math.max(0, scope.rank_end - scope.rank_start + 1);
 function showProgress({ rank = null, inspected = 0, contest = "" } = {}) {
   const total = totalRanks();
   if (!scanning) {
+    const want = Number($("#count").value) || total;
     $("#progress").innerHTML =
-      `<span class="dim">A scan covers ranks ${scope.rank_start}–${scope.rank_end}` +
-      ` — ${total} contestants.</span>`;
+      `<span class="dim">Next scan covers the top ${want} contestants.</span>`;
     return;
   }
   const done = rank === null ? 0 : rank - scope.rank_start + 1;
@@ -46,6 +46,7 @@ es.onmessage = (m) => {
     showProgress({ rank: ev.rank, inspected: reportedSoFar, contest: currentContest });
   } else if (ev.type === "scan_start") {
     scanning = true; reportedSoFar = 0; currentContest = ev.contest;
+    if (ev.rank_end) scope = { rank_start: ev.rank_start, rank_end: ev.rank_end };
     setRunning(true);
     showProgress({ contest: currentContest });
     line(`Scan started: ${ev.contest}`, "warn");
@@ -64,20 +65,28 @@ es.onmessage = (m) => {
 };
 
 function setRunning(on) {
+  const haveSlug = !!$("#slug").value.trim();
   $("#stop").disabled = !on;
-  $("#scan").disabled = on || !setupReady;
+  $("#scan").disabled = on || !setupReady || !haveSlug;
   $("#scan").textContent = on ? "Scanning…" : "Start scanning";
+  $("#blocked").textContent = on ? ""
+    : !setupReady ? "Finish setup to scan."
+    : !haveSlug ? "Enter a contest number." : "";
 }
 
 // --- controls ------------------------------------------------------------
 $("#scan").onclick = async () => {
   const slug = $("#slug").value.trim();
-  if (!slug) return line("Enter a contest number first.", "error");
-  const r = await (await fetch(`/api/scan/${slug}`, { method: "POST" })).json();
+  if (!slug) { $("#slug").focus(); return line("Enter a contest number first.", "error"); }
+  const n = Math.max(1, Number($("#count").value) || 100);
+  const r = await (await fetch(`/api/scan/${encodeURIComponent(slug)}?contestants=${n}`,
+                               { method: "POST" })).json();
   if (!r.ok) line(r.error, "error");
 };
 $("#stop").onclick = () => fetch("/api/stop", { method: "POST" });
 $("#clearlog").onclick = () => { logbody.innerHTML = ""; };
+$("#slug").oninput = () => { if (!scanning) setRunning(false); };
+$("#count").oninput = () => { if (!scanning) showProgress(); };
 $("#slug").onkeydown = (e) => {
   if (e.key === "Enter" && !$("#scan").disabled) $("#scan").click();
 };
@@ -161,10 +170,7 @@ async function refreshSetup() {
         </div>`).join(""));
 
   // Scanning without a signed-in browser only ever produces a failed scan.
-  if (!scanning) {
-    $("#scan").disabled = !setupReady;
-    $("#blocked").textContent = setupReady ? "" : "Finish setup to scan.";
-  }
+  if (!scanning) setRunning(false);
 
   const start = $("#start-browser");
   if (start) start.onclick = async () => {

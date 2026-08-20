@@ -34,12 +34,16 @@ def get_config():
 
 
 @app.post("/api/scan/{contest_slug}")
-def start_scan(contest_slug: str):
+def start_scan(contest_slug: str, contestants: int | None = None):
+    """Start a scan. `contestants` overrides the configured rank range."""
     if _pipeline.running:
         return {"ok": False, "error": "a scan is already running"}
     slug = contest.normalise_slug(contest_slug)
-    threading.Thread(target=_pipeline.scan, args=(slug,), daemon=True).start()
-    return {"ok": True, "slug": slug}
+    if contestants is not None and contestants < 1:
+        return {"ok": False, "error": "contestants must be at least 1"}
+    threading.Thread(target=_pipeline.scan, args=(slug,),
+                     kwargs={"contestants": contestants}, daemon=True).start()
+    return {"ok": True, "slug": slug, "contestants": contestants}
 
 
 @app.post("/api/stop")

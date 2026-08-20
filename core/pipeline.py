@@ -23,9 +23,16 @@ class Pipeline:
         self._stop.set()
         self.emit({"type": "log", "level": "warn", "msg": "Stop requested."})
 
-    def scan(self, contest_slug):
+    def scan(self, contest_slug, contestants=None):
+        """Scan one contest.
+
+        `contestants` overrides how far down the leaderboard to go, counting
+        from the configured starting rank. None means use the configured range.
+        """
         cfg = config.load(reload=True)
-        safety, scope = cfg["safety"], cfg["scope"]
+        safety, scope = cfg["safety"], dict(cfg["scope"])
+        if contestants:
+            scope["rank_end"] = scope["rank_start"] + int(contestants) - 1
         dry_run = safety["dry_run"]
 
         self.running = True
@@ -36,7 +43,11 @@ class Pipeline:
         last_report_at = 0.0
         status = "done"
 
-        self.emit({"type": "scan_start", "contest": contest_slug, "dry_run": dry_run})
+        # The range goes out with the event so the UI counts against what is
+        # actually being scanned, not what the config file happens to say.
+        self.emit({"type": "scan_start", "contest": contest_slug,
+                   "dry_run": dry_run, "rank_start": scope["rank_start"],
+                   "rank_end": scope["rank_end"]})
         if dry_run:
             self.emit({"type": "log", "level": "warn",
                        "msg": "DRY RUN - reports are composed and stored, nothing "
@@ -178,7 +189,11 @@ class Pipeline:
                                 question_index=index_of[qid], narrative=text,
                                 problem_count=len(qs),
                                 ui_page=(row["rank"] - 1) // 25 + 1,
-                                dry_run=dry_run, contest_submission_id=csid)
+                                dry_run=dry_run, contest_submission_id=csid,
+                                rank=row["rank"],
+                                finish_offset=(row["finish_time"] -
+                                               meta["start_time"])
+                                if row.get("finish_time") else None)
                             store.mark_report(conn, report_id, outcome)
                         except Exception as exc:
                             store.mark_report(conn, report_id, "failed", str(exc))

@@ -23,11 +23,16 @@ h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 .pill.live { background: #3a1416; color: var(--danger); border-color: #6b2427; }
 
 /* --- controls ---------------------------------------------------------- */
-.controls { display: flex; gap: 8px; align-items: center; padding: 16px 22px 0; }
+.controls { display: flex; gap: 10px; align-items: flex-end; padding: 16px 22px 0;
+            flex-wrap: wrap; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field > span { font-size: 10.5px; color: var(--dim); text-transform: uppercase;
+                letter-spacing: .05em; }
 input {
   background: var(--panel); border: 1px solid var(--line); color: var(--fg);
-  padding: 9px 12px; border-radius: 7px; width: 150px; font: inherit;
+  padding: 9px 12px; border-radius: 7px; width: 190px; font: inherit;
 }
+#count { width: 96px; }
 input:focus { outline: none; border-color: #3d4553; }
 button {
   background: var(--panel); border: 1px solid var(--line); color: var(--fg);

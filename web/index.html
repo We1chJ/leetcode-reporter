@@ -18,7 +18,16 @@
 <section id="setup" class="setup"></section>
 
 <section class="controls">
-  <input id="slug" placeholder="515" title="Contest number, or a full slug" autocomplete="off">
+  <label class="field">
+    <span>Contest</span>
+    <input id="slug" placeholder="Enter a contest number" required
+           title="Contest number, or a full slug" autocomplete="off">
+  </label>
+  <label class="field">
+    <span>Contestants</span>
+    <input id="count" type="number" min="1" max="5000" step="1" value="100"
+           title="How far down the leaderboard to scan">
+  </label>
   <button id="scan" class="primary">Start scanning</button>
   <button id="stop" class="danger" disabled>Stop</button>
   <span id="blocked" class="dim"></span>

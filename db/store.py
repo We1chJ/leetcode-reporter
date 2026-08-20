@@ -75,7 +75,19 @@ def record_report(conn, *, username, contest_slug, question_slug, submission_id,
          int(dry_run)),
     )
     conn.commit()
-    return cur.lastrowid if cur.rowcount else None
+    if cur.rowcount:
+        return cur.lastrowid
+
+    # Already on file. Hand back the existing row so a report that never landed
+    # can be attempted again -- an attempt that failed partway (a closed page, a
+    # disabled Submit button) must not exempt the submission for good.
+    row = conn.execute(
+        "SELECT id, outcome FROM reports WHERE submission_id=? AND reason_code=?",
+        (submission_id, reason_code),
+    ).fetchone()
+    if row and row["outcome"] != "submitted":
+        return row["id"]
+    return None
 
 
 def mark_report(conn, report_id, outcome, error=None):
@@ -87,14 +99,18 @@ def mark_report(conn, report_id, outcome, error=None):
 
 
 def already_reported(conn, submission_id):
-    """Has this submission already been filed?
+    """Has this submission already been filed successfully?
 
-    Grey rows deliberately do not count: a submission recorded for review must
-    still be re-examined on a later scan, or a one-off grey verdict would
-    exempt it forever.
+    Only a report that actually landed counts. A row whose attempt failed is
+    unfinished business, not a record of a filing, and skipping it would leave
+    the submission unreportable for good.
+
+    Grey rows do not count either: a submission recorded for review must still
+    be re-examined on a later scan.
     """
     return conn.execute(
-        "SELECT 1 FROM reports WHERE submission_id=? AND verdict=?",
+        "SELECT 1 FROM reports WHERE submission_id=? AND verdict=? "
+        "AND outcome='submitted'",
         (submission_id, CHEAT),
     ).fetchone() is not None
 
