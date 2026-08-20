@@ -14,6 +14,7 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_reports_contest ON reports (contest_slug);
 CREATE INDEX IF NOT EXISTS idx_reports_verdict ON reports (verdict);
+CREATE INDEX IF NOT EXISTS idx_rank_contest ON rank_history (contest_slug, username);
 """
 
 CHEAT = "cheat"
@@ -214,3 +215,50 @@ def scans(conn, limit=50):
         "SELECT * FROM scans ORDER BY id DESC LIMIT ?", (limit,)
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# --- my own rank ---------------------------------------------------------
+
+def record_rank(conn, contest_slug, username, rank):
+    """Append one reading of my rank in a contest.
+
+    Consecutive identical readings are skipped: a scan that moved nobody says
+    nothing new, and the first and latest values are what the total is built
+    from either way.
+    """
+    last = conn.execute(
+        "SELECT rank FROM rank_history WHERE contest_slug=? AND username=? "
+        "ORDER BY id DESC LIMIT 1", (contest_slug, username)).fetchone()
+    if last and last["rank"] == rank:
+        return None
+    cur = conn.execute(
+        "INSERT INTO rank_history (contest_slug, username, rank, seen_at) "
+        "VALUES (?,?,?,?)", (contest_slug, username, rank, _now()))
+    conn.commit()
+    return cur.lastrowid
+
+
+def rank_progress(conn, username=None):
+    """Per contest: the first rank recorded, the latest, and the gain.
+
+    `moved_up` is first minus latest, so a smaller rank number -- which is a
+    better placing -- reads as a positive gain.
+    """
+    sql = ("SELECT h.contest_slug, h.username, COUNT(*) AS readings,"
+           " MIN(h.seen_at) AS first_at, MAX(h.seen_at) AS last_at,"
+           " (SELECT rank FROM rank_history WHERE contest_slug=h.contest_slug"
+           "    AND username=h.username ORDER BY id ASC  LIMIT 1) AS first_rank,"
+           " (SELECT rank FROM rank_history WHERE contest_slug=h.contest_slug"
+           "    AND username=h.username ORDER BY id DESC LIMIT 1) AS latest_rank"
+           " FROM rank_history h")
+    args = ()
+    if username:
+        sql += " WHERE h.username=?"
+        args = (username,)
+    sql += " GROUP BY h.contest_slug, h.username ORDER BY last_at DESC"
+    out = []
+    for r in conn.execute(sql, args):
+        d = dict(r)
+        d["moved_up"] = d["first_rank"] - d["latest_rank"]
+        out.append(d)
+    return out

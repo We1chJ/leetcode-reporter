@@ -118,3 +118,30 @@ def leaderboard(session, slug, rank_start, rank_end, delay=1.0, on_progress=None
         if on_progress:
             on_progress(page, last)
         time.sleep(delay)
+
+
+_RANK_HISTORY = """
+query rankHistory($u: String!) {
+  userContestRankingHistory(username: $u) {
+    attended ranking contest { title }
+  }
+}"""
+
+
+def my_rank(session, slug, username):
+    """My placing in one contest, or None if I did not attend it.
+
+    LeetCode exposes no per-contest lookup, only the whole attended history,
+    keyed by contest title rather than slug -- so the titles are slugified back
+    and matched. A contest the user did not enter simply is not in the list,
+    which is not an error: there is no rank to track.
+    """
+    data = session.graphql(_RANK_HISTORY, {"u": username})
+    hist = (data or {}).get("userContestRankingHistory") or []
+    for h in hist:
+        if not h.get("attended"):
+            continue
+        title = (h.get("contest") or {}).get("title") or ""
+        if re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") == slug:
+            return h.get("ranking")
+    return None

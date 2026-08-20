@@ -109,6 +109,28 @@ class Pipeline:
                 who = session.whoami()
                 self.emit({"type": "log", "msg": f"Signed in as {who}."})
 
+                # My own placing in this contest, recorded before the scan
+                # changes anything. Only meaningful for a contest I entered;
+                # for any other there is simply no rank, which is not an error.
+                try:
+                    mine = contest.my_rank(session, contest_slug, who)
+                except Exception as exc:
+                    mine = None
+                    self.emit({"type": "log", "level": "warn",
+                               "msg": f"Could not read my rank ({exc})."})
+                if mine is None:
+                    self.emit({"type": "log",
+                               "msg": f"{who} did not enter this contest - "
+                                      "no rank to track."})
+                else:
+                    prev = store.rank_progress(conn, who)
+                    was = next((r["first_rank"] for r in prev
+                                if r["contest_slug"] == contest_slug), None)
+                    store.record_rank(conn, contest_slug, who, mine)
+                    moved = "" if was is None else f", {was - mine:+d} since first seen"
+                    self.emit({"type": "log",
+                               "msg": f"My rank in this contest: {mine}{moved}."})
+
                 meta = contest.info(session, contest_slug)
                 qs = contest.questions(session, contest_slug)
                 credit = {str(q["question_id"]): q["credit"] for q in qs}

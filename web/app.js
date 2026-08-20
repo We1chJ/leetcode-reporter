@@ -301,6 +301,19 @@ async function refresh() {
     ["last_seen", "Last", when],
   ], "Nobody caught yet.");
 
+  // A smaller rank number is a better placing, so the gain is first minus
+  // latest and a positive number means moved up.
+  const gain = (v) => v > 0 ? `<span class="good">+${v}</span>`
+    : v < 0 ? `<span class="error">${v}</span>` : `<span class="dim">0</span>`;
+  $("#ranks").innerHTML = table(await (await fetch("/api/ranks")).json(), [
+    ["contest_slug", "Contest"],
+    ["first_rank", "First seen"],
+    ["latest_rank", "Now"],
+    ["moved_up", "Places gained", gain],
+    ["readings", "Readings"],
+    ["last_at", "Last checked", when],
+  ], "No rank recorded yet. Scan a contest you entered.");
+
   $("#scans").innerHTML = table(await (await fetch("/api/scans")).json(), [
     ["contest_slug", "Contest"],
     ["started_at", "Started", when],

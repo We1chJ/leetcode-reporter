@@ -111,6 +111,16 @@ def resume():
     return {"ok": True, "paused": False}
 
 
+@app.get("/api/ranks")
+def ranks():
+    """My own placing per contest: first recorded, latest, and the gain."""
+    conn = store.connect()
+    try:
+        return store.rank_progress(conn)
+    finally:
+        conn.close()
+
+
 @app.get("/api/stats")
 def stats():
     """Lifetime totals across every scan ever run."""

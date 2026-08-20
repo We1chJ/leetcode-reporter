@@ -33,3 +33,13 @@ CREATE TABLE IF NOT EXISTS scans (
     reported      INTEGER NOT NULL DEFAULT 0,
     status        TEXT NOT NULL DEFAULT 'running'
 );
+
+-- One reading of my own rank in a contest, taken at scan time. Append-only:
+-- the point is the series, so a rank is never overwritten, only added to.
+CREATE TABLE IF NOT EXISTS rank_history (
+    id            INTEGER PRIMARY KEY,
+    contest_slug  TEXT    NOT NULL,
+    username      TEXT    NOT NULL,
+    rank          INTEGER NOT NULL,
+    seen_at       TEXT    NOT NULL
+);
