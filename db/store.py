@@ -154,14 +154,20 @@ def stats(conn):
     is excluded, and scanning the same contest twice still counts one contest
     and one finding per submission.
     """
-    caught, suspicious = conn.execute(
+    caught, suspicious, users_caught, users_suspicious = conn.execute(
         "SELECT COUNT(DISTINCT CASE WHEN verdict=? THEN submission_id END),"
-        "       COUNT(DISTINCT CASE WHEN verdict=? THEN submission_id END) "
-        "FROM reports", (CHEAT, GREY),
+        "       COUNT(DISTINCT CASE WHEN verdict=? THEN submission_id END),"
+        "       COUNT(DISTINCT CASE WHEN verdict=? THEN username END),"
+        "       COUNT(DISTINCT CASE WHEN verdict=? THEN username END) "
+        "FROM reports", (CHEAT, GREY, CHEAT, GREY),
     ).fetchone()
-    sent = conn.execute(
-        "SELECT COUNT(*) FROM reports WHERE outcome='submitted'"
-    ).fetchone()[0]
+    # Two ways to count what was filed: one row per report, and one per person.
+    # A contestant who pasted all four problems is four reports but one
+    # offender, and the headline is about people.
+    sent, users_reported = conn.execute(
+        "SELECT COUNT(*), COUNT(DISTINCT username) "
+        "FROM reports WHERE outcome='submitted'"
+    ).fetchone()
     contestants, submissions, contests = conn.execute(
         "SELECT COALESCE(SUM(ranks_scanned), 0),"
         "       COALESCE(SUM(submissions_seen), 0),"
@@ -172,6 +178,9 @@ def stats(conn):
         "cheating_submissions_caught": caught,
         "reports_submitted": sent,
         "suspicious_recorded": suspicious,
+        "users_caught": users_caught,
+        "users_reported": users_reported,
+        "users_suspicious": users_suspicious,
         "contestants_scanned": contestants,
         "submissions_scanned": submissions,
         "contests_scanned": contests,

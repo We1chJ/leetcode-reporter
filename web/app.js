@@ -273,14 +273,22 @@ async function refresh() {
   // Every number is counted from the stored rows, so a stopped or failed scan
   // adds nothing and rescanning a contest does not inflate anything.
   const st = await (await fetch("/api/stats")).json();
+  // Headline numbers count people, not rows. Somebody who pasted all four
+  // problems is one offender, not four. The row-level count is still there on
+  // hover, and per contestant in the table below.
+  const per = (n, noun) => `${n ?? 0} ${noun}${n === 1 ? "" : "s"}`;
   $("#stats").innerHTML = [
-    ["Caught", st.cheating_submissions_caught, "big"],
-    ["Reports sent", st.reports_submitted, dry ? "muted" : ""],
-    ["Suspicious", st.suspicious_recorded],
-    ["Submissions inspected", st.submissions_scanned],
-    ["Contests scanned", st.contests_scanned],
-  ].map(([label, value, cls]) =>
-    `<div class="stat ${cls || ""}"><span class="n">${value ?? 0}</span>` +
+    ["Contestants caught", st.users_caught, "big",
+     per(st.cheating_submissions_caught, "submission")],
+    ["Contestants reported", st.users_reported, dry ? "muted" : "",
+     per(st.reports_submitted, "report") + " sent"],
+    ["Suspicious", st.users_suspicious, "",
+     per(st.suspicious_recorded, "submission") + ", recorded not reported"],
+    ["Submissions inspected", st.submissions_scanned, "", ""],
+    ["Contests scanned", st.contests_scanned, "", ""],
+  ].map(([label, value, cls, hint]) =>
+    `<div class="stat ${cls || ""}"${hint ? ` title="${esc(hint)}"` : ""}>` +
+    `<span class="n">${value ?? 0}</span>` +
     `<span class="l">${label}</span></div>`).join("");
 
   const users = await (await fetch("/api/by-user")).json();
