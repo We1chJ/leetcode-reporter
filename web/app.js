@@ -13,6 +13,7 @@ function line(text, cls = "") {
 // scan reports so the count is always against what is really being scanned.
 let scope = { rank_start: 1, rank_end: 100 };
 let scanning = false;
+let paused = false;
 let setupReady = false;
 
 const totalRanks = () => Math.max(0, scope.rank_end - scope.rank_start + 1);
@@ -35,7 +36,7 @@ function showProgress({ rank = null, inspected = 0, contest = "" } = {}) {
 }
 
 // --- live event stream ---------------------------------------------------
-let reportedSoFar = 0, currentContest = "";
+let reportedSoFar = 0, currentContest = "", lastRank = null;
 
 const es = new EventSource("/api/stream");
 es.onmessage = (m) => {
@@ -43,9 +44,14 @@ es.onmessage = (m) => {
   if (ev.type === "log") {
     line(ev.msg, ev.level === "warn" ? "warn" : ev.level === "error" ? "error" : "");
   } else if (ev.type === "progress") {
+    lastRank = ev.rank;
     showProgress({ rank: ev.rank, inspected: reportedSoFar, contest: currentContest });
+  } else if (ev.type === "state") {
+    paused = !!ev.paused;
+    setRunning(scanning);
+    showProgress({ rank: lastRank, inspected: reportedSoFar, contest: currentContest });
   } else if (ev.type === "scan_start") {
-    scanning = true; reportedSoFar = 0; currentContest = ev.contest;
+    scanning = true; paused = false; reportedSoFar = 0; currentContest = ev.contest;
     if (ev.rank_end) scope = { rank_start: ev.rank_start, rank_end: ev.rank_end };
     setRunning(true);
     showProgress({ contest: currentContest });
@@ -55,7 +61,7 @@ es.onmessage = (m) => {
     line(`REPORT ${ev.user} / ${ev.question} — ${ev.reason} (${ev.score}) → ${ev.outcome}`, "good");
     refresh();
   } else if (ev.type === "scan_end") {
-    scanning = false;
+    scanning = false; paused = false;
     setRunning(false);
     showProgress();
     line(`Scan ${ev.status}: ${ev.scanned} contestants, ${ev.inspected} inspected, ` +
@@ -66,9 +72,15 @@ es.onmessage = (m) => {
 
 function setRunning(on) {
   const haveSlug = !!$("#slug").value.trim();
+  // Stop and Pause stay live for the whole run: they are the only way out of
+  // a scan, so they must never be the thing that is disabled.
   $("#stop").disabled = !on;
+  $("#stop").textContent = "Stop";
+  $("#pause").disabled = !on;
+  $("#pause").textContent = paused ? "Resume" : "Pause";
+  $("#pause").classList.toggle("primary", paused && on);
   $("#scan").disabled = on || !setupReady || !haveSlug;
-  $("#scan").textContent = on ? "Scanning…" : "Start scanning";
+  $("#scan").textContent = on ? (paused ? "Paused" : "Scanning…") : "Start scanning";
   $("#blocked").textContent = on ? ""
     : !setupReady ? "Finish setup to scan."
     : !haveSlug ? "Enter a contest number." : "";
@@ -83,7 +95,19 @@ $("#scan").onclick = async () => {
                                { method: "POST" })).json();
   if (!r.ok) line(r.error, "error");
 };
-$("#stop").onclick = () => fetch("/api/stop", { method: "POST" });
+$("#stop").onclick = () => {
+  $("#stop").disabled = true;
+  $("#stop").textContent = "Stopping…";
+  fetch("/api/stop", { method: "POST" });
+};
+$("#pause").onclick = async () => {
+  // Optimistic: the button answers at once, the scan catches up at the next
+  // step boundary. The state event puts it right either way.
+  const want = !paused;
+  $("#pause").disabled = true;
+  await fetch(want ? "/api/pause" : "/api/resume", { method: "POST" });
+  $("#pause").disabled = false;
+};
 $("#clearlog").onclick = () => { logbody.innerHTML = ""; };
 $("#slug").oninput = () => { if (!scanning) setRunning(false); };
 $("#count").oninput = () => { if (!scanning) showProgress(); };
@@ -187,7 +211,13 @@ async function refresh() {
   refreshSetup();
 
   const cfg = await (await fetch("/api/config")).json();
-  scope = cfg.scope;
+  // Adopt the server's state rather than assuming idle: after a page reload
+  // mid-scan the buttons would otherwise be dead, leaving no way to stop.
+  if (cfg.running !== scanning || cfg.paused !== paused) {
+    scanning = cfg.running; paused = cfg.paused;
+    setRunning(scanning);
+  }
+  if (!scanning) scope = cfg.scope;
   const dry = cfg.safety.dry_run;
   $("#mode").textContent = dry ? "dry run" : "live";
   $("#mode").className = "pill" + (dry ? "" : " live");

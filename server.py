@@ -30,7 +30,8 @@ app.mount("/static", StaticFiles(directory=config.ROOT / "web"), name="static")
 def get_config():
     cfg = config.load(reload=True)
     return {"safety": cfg["safety"], "scope": cfg["scope"],
-            "detect": cfg["detect"], "running": _pipeline.running}
+            "detect": cfg["detect"], "running": _pipeline.running,
+            "paused": _pipeline.paused}
 
 
 @app.post("/api/scan/{contest_slug}")
@@ -50,6 +51,21 @@ def start_scan(contest_slug: str, contestants: int | None = None):
 def stop():
     _pipeline.stop()
     return {"ok": True}
+
+
+@app.post("/api/pause")
+def pause():
+    """Hold the scan at the next step boundary. Nothing is lost."""
+    if not _pipeline.running:
+        return {"ok": False, "error": "no scan is running"}
+    _pipeline.pause()
+    return {"ok": True, "paused": True}
+
+
+@app.post("/api/resume")
+def resume():
+    _pipeline.resume()
+    return {"ok": True, "paused": False}
 
 
 @app.get("/api/stats")

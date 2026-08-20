@@ -12,16 +12,65 @@ from db import store
 
 
 class Pipeline:
-    """One scan at a time. `stop()` is the kill switch."""
+    """One scan at a time. `stop()` is the kill switch, `pause()` the hold.
+
+    Both are cooperative: the scan spends most of its time inside Playwright
+    calls that cannot be interrupted from another thread, so it checks between
+    steps instead. The checks sit either side of every slow step, and every
+    sleep is a wait on the stop event rather than time.sleep, so a stop lands
+    within the current step rather than after the next 45-second throttle.
+    """
 
     def __init__(self, emit):
         self.emit = emit                 # emit(dict) -> pushed to the UI over SSE
         self._stop = threading.Event()
+        self._pause = threading.Event()
         self.running = False
+
+    @property
+    def paused(self):
+        return self._pause.is_set()
 
     def stop(self):
         self._stop.set()
+        # Releases the scan if it is sitting in a pause.
+        self._pause.clear()
         self.emit({"type": "log", "level": "warn", "msg": "Stop requested."})
+
+    def pause(self):
+        if self.running and not self._pause.is_set():
+            self._pause.set()
+            self.emit({"type": "log", "level": "warn",
+                       "msg": "Paused - finishing the current step first."})
+            self.emit({"type": "state", "paused": True})
+
+    def resume(self):
+        if self._pause.is_set():
+            self._pause.clear()
+            self.emit({"type": "log", "msg": "Resumed."})
+            self.emit({"type": "state", "paused": False})
+
+    def _go(self):
+        """Hold here while paused. False means the scan should stop."""
+        while self._pause.is_set() and not self._stop.is_set():
+            self._stop.wait(0.2)
+        return not self._stop.is_set()
+
+    def _wait(self, seconds):
+        """Sleep, waking at once on stop and holding while paused.
+
+        The deadline is wall-clock, so time spent paused counts towards the
+        report throttle -- pausing can only ever make the pacing gentler.
+        """
+        deadline = time.time() + seconds
+        while True:
+            if not self._go():
+                return False
+            left = deadline - time.time()
+            if left <= 0:
+                return True
+            if self._stop.wait(min(left, 0.5)):
+                return False
 
     def scan(self, contest_slug, contestants=None):
         """Scan one contest.
@@ -37,6 +86,7 @@ class Pipeline:
 
         self.running = True
         self._stop.clear()
+        self._pause.clear()
         conn = store.connect()
         scan_id = store.start_scan(conn, contest_slug)
         scanned = inspected = flagged = reported = 0
@@ -73,7 +123,7 @@ class Pipeline:
                     session, contest_slug, scope["rank_start"], scope["rank_end"],
                     delay=scope["request_delay"],
                 ):
-                    if self._stop.is_set():
+                    if not self._go():
                         status = "stopped"
                         break
                     scanned += 1
@@ -87,7 +137,7 @@ class Pipeline:
                     # top of a leaderboard and never scores on its own.
 
                     for qid, sub in row["submissions"].items():
-                        if self._stop.is_set():
+                        if not self._go():
                             break
                         if index_of.get(qid) not in wanted:
                             continue
@@ -96,6 +146,13 @@ class Pipeline:
                             continue
 
                         qslug = slug_of.get(qid, qid)
+
+                        # Gate before the replay read, the slowest step here.
+                        # It has to break rather than skip the read: judging a
+                        # submission whose replay was never fetched would score
+                        # it on missing evidence.
+                        if not self._go():
+                            break
 
                         # Read the Code Replay: both the event history and the
                         # growth curve. This is the whole basis of the judgment,
@@ -180,8 +237,14 @@ class Pipeline:
 
                         gap = safety["min_seconds_between_reports"] - (
                             time.time() - last_report_at)
-                        if gap > 0 and not dry_run:
-                            time.sleep(gap)
+                        if gap > 0 and not dry_run and not self._wait(gap):
+                            break
+
+                        # Last check before the one step that changes anything
+                        # outside this machine. Stopping here leaves the finding
+                        # stored and unsent, which a later scan will pick up.
+                        if not self._go():
+                            break
 
                         try:
                             outcome = reporter.file_report(
