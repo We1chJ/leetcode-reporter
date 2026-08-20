@@ -62,6 +62,18 @@ class ReportError(RuntimeError):
     pass
 
 
+# el.click() is an HTMLElement method. The replay control is an <svg>, and
+# SVGElement does not inherit it, so the fallback used to die with
+# "el.click is not a function" on exactly the element it was written for.
+# Dispatching a bubbling MouseEvent works on any element and still reaches
+# React's delegated handler.
+_DISPATCH = """el => {
+  if (typeof el.click === 'function') { el.click(); return; }
+  el.dispatchEvent(new MouseEvent('click',
+      {bubbles: true, cancelable: true, view: window}));
+}"""
+
+
 def _click(locator, timeout_ms=5_000):
     """Click through the modal overlay.
 
@@ -71,7 +83,7 @@ def _click(locator, timeout_ms=5_000):
     try:
         locator.click(timeout=timeout_ms)
     except Exception:
-        locator.evaluate("el => el.click()")
+        locator.evaluate(_DISPATCH)
 
 
 def open_submission(session, contest_slug, username, question_index,
@@ -84,12 +96,27 @@ def open_submission(session, contest_slug, username, question_index,
     """
     page = session.page
     replay.ensure_ranking_page(session, contest_slug, ui_page)
+    # The detection pass leaves its replay modal open, and its overlay swallows
+    # the click below. The replay path already closes it before clicking; this
+    # one did not, which is what pushed every report into the _click fallback.
+    replay._close(page)
     row = replay.find_row(page, username, rank=rank, finish_offset=finish_offset)
     cell = replay.problem_cell(row, question_index, problem_count)
     if cell is None:
         raise ReportError(
             f"{username}: no submission cell at index {question_index}")
     _click(cell.locator("svg").last)
+
+    # A China-hosted replay offers to send you to leetcode.cn instead of
+    # rendering, and there is no Report Cheating control behind that offer.
+    # Decline it and skip, rather than waiting out the timeout. The check reads
+    # the open dialog, so it has to wait for one to exist first -- calling it
+    # too early finds nothing and passes a China offer straight through.
+    try:
+        page.wait_for_selector("div[role='dialog']", timeout=8_000)
+    except Exception:
+        pass
+    replay._decline_china_redirect(page)
     page.get_by_text("Report Cheating", exact=False).first.wait_for(timeout=20_000)
 
 
@@ -154,16 +181,21 @@ def submit_report(session, narrative, dry_run=True):
     return "submitted"
 
 
-def confirm_registered(session, contest_submission_id, tries=3):
+def confirm_registered(session, contest_submission_id, tries=6):
     """Ask LeetCode whether the report actually landed.
 
     A click that silently failed would otherwise be counted as a report sent,
     so the count would overstate what was really filed.
+
+    LeetCode does not always answer yes immediately after the dialog closes.
+    Three tries at 1.5s gave up after 4.5s and marked landed reports failed, so
+    back off over roughly 20s, returning the moment it shows up.
     """
-    for _ in range(tries):
+    for attempt in range(tries):
         if replay.existing_report(session, contest_submission_id):
             return True
-        time.sleep(1.5)
+        if attempt < tries - 1:
+            time.sleep(min(1.5 * (attempt + 1), 6))
     return False
 
 
