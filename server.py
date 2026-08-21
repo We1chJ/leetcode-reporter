@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from core import chrome, config, contest
+from core.browser import Session
 from core.pipeline import Pipeline
 from db import store
 
@@ -109,6 +110,39 @@ def pause():
 def resume():
     _pipeline.resume()
     return {"ok": True, "paused": False}
+
+
+@app.post("/api/rank/{contest_slug}")
+def refresh_rank(contest_slug: str):
+    """Read my placing in one contest right now and record it.
+
+    Nothing to do with reporting: it opens the browser, asks one endpoint, and
+    stores the answer. It refuses while a scan is running, because both would
+    be driving the same Chrome page and the scan would lose its footing.
+    """
+    if _pipeline.running:
+        return {"ok": False, "error": "a scan is running; it shares the browser"}
+    slug = contest.normalise_slug(contest_slug)
+    try:
+        with Session() as session:
+            session.require_login()
+            who = session.whoami()
+            rank = contest.my_rank(session, slug, who)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    if rank is None:
+        return {"ok": False, "slug": slug,
+                "error": f"{who} did not take part in {slug}"}
+
+    conn = store.connect()
+    try:
+        stored = store.record_rank(conn, slug, who, rank)
+        row = next((r for r in store.rank_progress(conn, who)
+                    if r["contest_slug"] == slug), None)
+    finally:
+        conn.close()
+    return {"ok": True, "slug": slug, "username": who, "rank": rank,
+            "changed": stored is not None, "progress": row}
 
 
 @app.get("/api/ranks")

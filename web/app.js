@@ -155,6 +155,35 @@ if ($("#pause")) $("#pause").onclick = async () => {
   await fetch(want ? "/api/pause" : "/api/resume", { method: "POST" });
   $("#pause").disabled = false;
 };
+// Reading my own placing is not reporting: separate button, separate call,
+// and it never touches a submission.
+if ($("#rankrefresh")) $("#rankrefresh").onclick = async () => {
+  const slug = $("#slug").value.trim();
+  const msg = $("#rankmsg");
+  if (!slug) { $("#slug").focus(); msg.textContent = "Enter a contest number above first."; return; }
+  const btn = $("#rankrefresh");
+  btn.disabled = true; btn.textContent = "Reading…";
+  try {
+    const r = await (await fetch(`/api/rank/${encodeURIComponent(slug)}`,
+                                 { method: "POST" })).json();
+    if (!r.ok) { msg.textContent = r.error; line(`Rank: ${r.error}`, "warn"); }
+    else {
+      const p = r.progress || {};
+      msg.textContent = `${r.slug}: rank ${r.rank}` +
+        (r.changed ? "" : " (unchanged)") +
+        (p.best_rank != null ? ` · best ${p.best_rank}, worst ${p.worst_rank}` : "");
+      line(`Rank in ${r.slug}: ${r.rank}` +
+           (p.moved_up ? ` (${p.moved_up > 0 ? "+" : ""}${p.moved_up} since first seen)` : ""),
+           "good");
+    }
+  } catch (e) {
+    msg.textContent = String(e);
+  } finally {
+    btn.disabled = false; btn.textContent = "Refresh my rank";
+    refresh();
+  }
+};
+
 $("#clearlog").onclick = () => { logbody.innerHTML = ""; };
 $("#slug").oninput = () => { if (!scanning) setRunning(false); };
 $("#count").oninput = () => { if (!scanning) showProgress(); };
@@ -305,14 +334,18 @@ async function refresh() {
   // latest and a positive number means moved up.
   const gain = (v) => v > 0 ? `<span class="good">+${v}</span>`
     : v < 0 ? `<span class="error">${v}</span>` : `<span class="dim">0</span>`;
-  $("#ranks").innerHTML = table(await (await fetch("/api/ranks")).json(), [
+  const ranks = await (await fetch("/api/ranks")).json();
+  $("#ranktable").innerHTML = table(ranks, [
     ["contest_slug", "Contest"],
     ["first_rank", "First seen"],
-    ["latest_rank", "Now"],
+    ["latest_rank", "Now", (v, row) => row.at_best
+      ? `<b class="good">${v}</b> <span class="dim">best yet</span>` : v],
+    ["best_rank", "Best"],
+    ["worst_rank", "Worst"],
     ["moved_up", "Places gained", gain],
     ["readings", "Readings"],
     ["last_at", "Last checked", when],
-  ], "No rank recorded yet. Scan a contest you entered.");
+  ], "No rank recorded yet. Enter a contest number and press Refresh my rank.");
 
   $("#scans").innerHTML = table(await (await fetch("/api/scans")).json(), [
     ["contest_slug", "Contest"],

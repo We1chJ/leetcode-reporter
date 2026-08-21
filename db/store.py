@@ -244,8 +244,12 @@ def rank_progress(conn, username=None):
     `moved_up` is first minus latest, so a smaller rank number -- which is a
     better placing -- reads as a positive gain.
     """
+    # MIN(rank) is the best placing ever seen and MAX(rank) the worst: a
+    # smaller rank number is a better result, so the names are the other way
+    # round from the arithmetic.
     sql = ("SELECT h.contest_slug, h.username, COUNT(*) AS readings,"
            " MIN(h.seen_at) AS first_at, MAX(h.seen_at) AS last_at,"
+           " MIN(h.rank) AS best_rank, MAX(h.rank) AS worst_rank,"
            " (SELECT rank FROM rank_history WHERE contest_slug=h.contest_slug"
            "    AND username=h.username ORDER BY id ASC  LIMIT 1) AS first_rank,"
            " (SELECT rank FROM rank_history WHERE contest_slug=h.contest_slug"
@@ -260,5 +264,9 @@ def rank_progress(conn, username=None):
     for r in conn.execute(sql, args):
         d = dict(r)
         d["moved_up"] = d["first_rank"] - d["latest_rank"]
+        # Sitting on the best number ever recorded, with something to compare
+        # against -- what the UI marks as a record.
+        d["at_best"] = (d["latest_rank"] == d["best_rank"]
+                        and d["best_rank"] != d["worst_rank"])
         out.append(d)
     return out
