@@ -143,25 +143,6 @@ class Session:
         if not self.whoami():
             raise RuntimeError("login did not complete")
 
-    def graphql(self, query, variables=None):
-        """POST a GraphQL query from inside the page. Returns `data`, or None."""
-        if "leetcode.com" not in self.page.url:
-            self.page.goto(f"{BASE}/contest/", wait_until="domcontentloaded")
-        res = self.page.evaluate(
-            """async (body) => {
-                try {
-                    const r = await fetch('/graphql/', {
-                        method: 'POST', credentials: 'include',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(body)});
-                    if (!r.ok) return null;
-                    return await r.json();
-                } catch (e) { return null; }
-            }""",
-            {"query": query, "variables": variables or {}},
-        )
-        return (res or {}).get("data")
-
     def get_json(self, url):
         """Fetch JSON from inside the page so cookies and CF clearance apply."""
         return self.page.evaluate(

@@ -54,6 +54,31 @@ Rows nest their own data:
 the top 100 (12.75%), and it corresponds exactly to the alternate (magnifier)
 icon shown in the ranking table instead of the plain play icon.
 
+## My own placing
+
+```
+GET /contest/api/myranking/{slug}/?region=global_v2
+{ my_rank: {rank, score, finish_time, user_slug, replays, ...} | null,
+  my_solved, my_submission, registered }
+```
+
+Found by watching what the ranking page fetches. `my_rank` is `null` for a
+contest the signed-in user did not take part in, so its presence is the
+participation check too.
+
+Two nearby things that look like they would work and do not:
+
+- The board renders your own row as the literal text **"You"**, with no
+  `/u/{username}/` link, so scraping the page for your username never finds
+  you however many pages you read.
+- GraphQL `userContestRankingHistory` returns the **rated** placing, a
+  different number from the board position — 2303 against 2865 on
+  weekly-contest-514 — and a contest is absent from it until rating is
+  recalculated, which lags the contest by days.
+
+`region=global` and `region=global_v2` can disagree slightly (1482 vs 1471 on
+weekly-contest-515). `global_v2` is what the ranking page itself uses.
+
 ## Contest timing
 
 ```

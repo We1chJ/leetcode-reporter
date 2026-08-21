@@ -120,28 +120,28 @@ def leaderboard(session, slug, rank_start, rank_end, delay=1.0, on_progress=None
         time.sleep(delay)
 
 
-_RANK_HISTORY = """
-query rankHistory($u: String!) {
-  userContestRankingHistory(username: $u) {
-    attended ranking contest { title }
-  }
-}"""
+MY_RANKING = "/contest/api/myranking/{slug}/?region=global_v2"
 
 
-def my_rank(session, slug, username):
-    """My placing in one contest, or None if I did not attend it.
+def my_rank(session, slug, username=None):
+    """My placing on this contest's board, or None if I did not take part.
 
-    LeetCode exposes no per-contest lookup, only the whole attended history,
-    keyed by contest title rather than slug -- so the titles are slugified back
-    and matched. A contest the user did not enter simply is not in the list,
-    which is not an error: there is no rank to track.
+    This is the endpoint the ranking page itself calls, found by watching its
+    network traffic. It is the right source for two reasons the obvious
+    alternatives are not:
+
+      - The board renders my own row as the literal text "You", with no
+        profile link, so scraping the page for my username never finds me.
+      - GraphQL userContestRankingHistory reports the *rated* placing, which
+        is a different number (2303 vs 2865 on weekly-contest-514) and does
+        not appear at all until rating is recalculated.
+
+    What changes when a cheat is removed is the board position, so that is
+    what gets tracked. `username` is accepted and ignored: the endpoint
+    answers for whoever is signed in.
     """
-    data = session.graphql(_RANK_HISTORY, {"u": username})
-    hist = (data or {}).get("userContestRankingHistory") or []
-    for h in hist:
-        if not h.get("attended"):
-            continue
-        title = (h.get("contest") or {}).get("title") or ""
-        if re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") == slug:
-            return h.get("ranking")
-    return None
+    data = session.get_json(MY_RANKING.format(slug=slug))
+    if not isinstance(data, dict) or "__error" in data:
+        return None
+    mine = data.get("my_rank")
+    return mine.get("rank") if isinstance(mine, dict) else None
