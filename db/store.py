@@ -169,11 +169,15 @@ def stats(conn):
         "SELECT COUNT(*), COUNT(DISTINCT username) "
         "FROM reports WHERE outcome='submitted'"
     ).fetchone()
-    contestants, submissions, contests = conn.execute(
-        "SELECT COALESCE(SUM(ranks_scanned), 0),"
-        "       COALESCE(SUM(submissions_seen), 0),"
-        "       COUNT(DISTINCT CASE WHEN ranks_scanned > 0 THEN contest_slug END) "
-        "FROM scans"
+    # Per contest, not per scan: the deepest scan of a contest is what was
+    # covered, so rescanning the top 100 five times is still 100 contestants.
+    # Summing the scan rows counted the same people once per rescan.
+    contestants, submissions, contests_seen = conn.execute(
+        "SELECT COALESCE(SUM(deepest), 0), COALESCE(SUM(seen), 0), COUNT(*) "
+        "FROM (SELECT MAX(ranks_scanned) AS deepest,"
+        "             MAX(submissions_seen) AS seen"
+        "        FROM scans GROUP BY contest_slug"
+        "       HAVING MAX(ranks_scanned) > 0)"
     ).fetchone()
     return {
         "cheating_submissions_caught": caught,
@@ -184,7 +188,7 @@ def stats(conn):
         "users_suspicious": users_suspicious,
         "contestants_scanned": contestants,
         "submissions_scanned": submissions,
-        "contests_scanned": contests,
+        "contests_scanned": contests_seen,
     }
 
 
@@ -210,9 +214,25 @@ def finish_scan(conn, scan_id, ranks_scanned, submissions_seen, flagged,
     conn.commit()
 
 
-def scans(conn, limit=50):
+def contests(conn, limit=50):
+    """One row per contest, however many times it has been scanned.
+
+    Depth is the deepest single scan, not the sum: scanning the top 100 twice
+    covers 100 contestants, not 200. Reports do sum, because a rescan only ever
+    files submissions the earlier scan did not.
+    """
     rows = conn.execute(
-        "SELECT * FROM scans ORDER BY id DESC LIMIT ?", (limit,)
+        "SELECT contest_slug,"
+        "       COUNT(*) AS scans,"
+        "       MAX(ranks_scanned) AS contestants,"
+        "       MAX(submissions_seen) AS inspected,"
+        "       SUM(reported) AS reported,"
+        "       MIN(started_at) AS first_at,"
+        "       MAX(started_at) AS last_at,"
+        "       (SELECT status FROM scans WHERE contest_slug = s.contest_slug"
+        "          ORDER BY id DESC LIMIT 1) AS status"
+        " FROM scans s GROUP BY contest_slug ORDER BY last_at DESC LIMIT ?",
+        (limit,),
     ).fetchall()
     return [dict(r) for r in rows]
 

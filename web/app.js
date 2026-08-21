@@ -349,10 +349,11 @@ async function refresh() {
 
   $("#scans").innerHTML = table(await (await fetch("/api/scans")).json(), [
     ["contest_slug", "Contest"],
-    ["started_at", "Started", when],
-    ["ranks_scanned", "Contestants"],
-    ["submissions_seen", "Inspected"],
+    ["scans", "Scans"],
+    ["contestants", "Contestants"],
+    ["inspected", "Inspected"],
     ["reported", "Reported"],
+    ["last_at", "Last scanned", when],
     ["status", "Status", badge],
   ], "No contest scanned yet.");
 }

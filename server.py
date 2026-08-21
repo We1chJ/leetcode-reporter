@@ -214,9 +214,10 @@ def reports():
 
 @app.get("/api/scans")
 def scans():
+    """One row per contest, not per scan."""
     conn = store.connect()
     try:
-        return store.scans(conn)
+        return store.contests(conn)
     finally:
         conn.close()
 
