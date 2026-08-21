@@ -158,28 +158,27 @@ if ($("#pause")) $("#pause").onclick = async () => {
 // Reading my own placing is not reporting: separate button, separate call,
 // and it never touches a submission.
 if ($("#rankrefresh")) $("#rankrefresh").onclick = async () => {
-  const slug = $("#slug").value.trim();
-  const msg = $("#rankmsg");
-  if (!slug) { $("#slug").focus(); msg.textContent = "Enter a contest number above first."; return; }
-  const btn = $("#rankrefresh");
+  const msg = $("#rankmsg"), btn = $("#rankrefresh");
   btn.disabled = true; btn.textContent = "Reading…";
+  msg.textContent = "Reading every contest you have entered…";
   try {
-    const r = await (await fetch(`/api/rank/${encodeURIComponent(slug)}`,
-                                 { method: "POST" })).json();
-    if (!r.ok) { msg.textContent = r.error; line(`Rank: ${r.error}`, "warn"); }
-    else {
-      const p = r.progress || {};
-      msg.textContent = `${r.slug}: rank ${r.rank}` +
-        (r.changed ? "" : " (unchanged)") +
-        (p.best_rank != null ? ` · best ${p.best_rank}, worst ${p.worst_rank}` : "");
-      line(`Rank in ${r.slug}: ${r.rank}` +
-           (p.moved_up ? ` (${p.moved_up > 0 ? "+" : ""}${p.moved_up} since first seen)` : ""),
-           "good");
+    const r = await (await fetch("/api/ranks/refresh", { method: "POST" })).json();
+    if (!r.ok) { msg.textContent = r.error; line(`Rank: ${r.error}`, "warn"); return; }
+    msg.textContent = `${r.contests} contest${r.contests === 1 ? "" : "s"} read, ` +
+      `${r.changed} changed` + (r.skipped ? `, ${r.skipped} not entered` : "");
+    line(`Ranks refreshed: ${r.contests} read, ${r.changed} changed.`, "good");
+    // Name the ones that actually moved -- the point of pressing the button.
+    for (const p of r.progress || []) {
+      if (p.moved_up) {
+        line(`  ${p.contest_slug}: ${p.latest_rank} ` +
+             `(${p.moved_up > 0 ? "+" : ""}${p.moved_up} since first seen` +
+             `${p.at_best ? ", best yet" : ""})`, p.moved_up > 0 ? "good" : "warn");
+      }
     }
   } catch (e) {
     msg.textContent = String(e);
   } finally {
-    btn.disabled = false; btn.textContent = "Refresh my rank";
+    btn.disabled = false; btn.textContent = "Refresh all my ranks";
     refresh();
   }
 };

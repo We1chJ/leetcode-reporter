@@ -4,6 +4,7 @@ import json
 import queue
 import re
 import threading
+import time
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
@@ -143,6 +144,43 @@ def refresh_rank(contest_slug: str):
         conn.close()
     return {"ok": True, "slug": slug, "username": who, "rank": rank,
             "changed": stored is not None, "progress": row}
+
+
+@app.post("/api/ranks/refresh")
+def refresh_all_ranks():
+    """Re-read my placing in every contest I have taken part in.
+
+    The list comes from my attended history, unioned with every contest this
+    database already knows -- the history lags a contest by days, so a contest
+    scanned this week can be missing from it while being exactly the one worth
+    checking. Contests I did not enter answer null and are skipped.
+    """
+    if _pipeline.running:
+        return {"ok": False, "error": "a scan is running; it shares the browser"}
+    conn = store.connect()
+    try:
+        with Session() as session:
+            session.require_login()
+            who = session.whoami()
+            slugs = sorted(set(contest.attended_slugs(session, who))
+                           | set(store.known_contests(conn)))
+            checked = changed = skipped = 0
+            for slug in slugs:
+                rank = contest.my_rank(session, slug, who)
+                if rank is None:
+                    skipped += 1
+                    continue
+                checked += 1
+                if store.record_rank(conn, slug, who, rank) is not None:
+                    changed += 1
+                time.sleep(0.2)          # a courtesy gap, not a required one
+        return {"ok": True, "username": who, "contests": checked,
+                "changed": changed, "skipped": skipped,
+                "progress": store.rank_progress(conn, who)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    finally:
+        conn.close()
 
 
 @app.get("/api/ranks")

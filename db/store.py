@@ -258,6 +258,14 @@ def record_rank(conn, contest_slug, username, rank):
     return cur.lastrowid
 
 
+def known_contests(conn):
+    """Every contest slug this database has heard of, scanned or ranked."""
+    rows = conn.execute(
+        "SELECT contest_slug FROM scans"
+        " UNION SELECT contest_slug FROM rank_history").fetchall()
+    return sorted(r["contest_slug"] for r in rows)
+
+
 def rank_progress(conn, username=None):
     """Per contest: the first rank recorded, the latest, and the gain.
 
