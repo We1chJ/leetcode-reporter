@@ -145,32 +145,3 @@ def my_rank(session, slug, username=None):
         return None
     mine = data.get("my_rank")
     return mine.get("rank") if isinstance(mine, dict) else None
-
-
-_ATTENDED = """
-query attended($u: String!) {
-  userContestRankingHistory(username: $u) {
-    attended contest { title }
-  }
-}"""
-
-
-def attended_slugs(session, username):
-    """Slugs of the contests I have taken part in, newest last.
-
-    Only good for *listing* which contests to ask about -- the ranking it
-    carries is the rated one, which is a different number from the board
-    position and lags a contest by days. The rank itself still comes from
-    my_rank. For the same reason this list can be missing a contest that only
-    just ran, so callers should union it with whatever they already know.
-    """
-    data = session.graphql(_ATTENDED, {"u": username})
-    out = []
-    for h in (data or {}).get("userContestRankingHistory") or []:
-        if not h.get("attended"):
-            continue
-        title = (h.get("contest") or {}).get("title") or ""
-        slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-        if slug:
-            out.append(slug)
-    return out

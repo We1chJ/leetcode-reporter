@@ -258,11 +258,15 @@ def record_rank(conn, contest_slug, username, rank):
     return cur.lastrowid
 
 
-def known_contests(conn):
-    """Every contest slug this database has heard of, scanned or ranked."""
-    rows = conn.execute(
-        "SELECT contest_slug FROM scans"
-        " UNION SELECT contest_slug FROM rank_history").fetchall()
+def scanned_contests(conn):
+    """Contest slugs this app has actually scanned.
+
+    Rank tracking follows scanning: a contest enters the list the first time it
+    is scanned, and its rank at that moment is the baseline everything later is
+    measured against. Contests entered before the app existed are deliberately
+    not tracked -- there is no baseline for them and nothing to attribute.
+    """
+    rows = conn.execute("SELECT DISTINCT contest_slug FROM scans").fetchall()
     return sorted(r["contest_slug"] for r in rows)
 
 
@@ -287,6 +291,10 @@ def rank_progress(conn, username=None):
     if username:
         sql += " WHERE h.username=?"
         args = (username,)
+    # Only contests the app scanned. A reading can outlive the reason it was
+    # taken, and the tab is about what this tool has been working on.
+    sql += (" AND" if username else " WHERE")
+    sql += " h.contest_slug IN (SELECT contest_slug FROM scans)"
     sql += " GROUP BY h.contest_slug, h.username ORDER BY last_at DESC"
     out = []
     for r in conn.execute(sql, args):

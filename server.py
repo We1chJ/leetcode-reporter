@@ -148,12 +148,11 @@ def refresh_rank(contest_slug: str):
 
 @app.post("/api/ranks/refresh")
 def refresh_all_ranks():
-    """Re-read my placing in every contest I have taken part in.
+    """Re-read my placing in every contest this app has scanned.
 
-    The list comes from my attended history, unioned with every contest this
-    database already knows -- the history lags a contest by days, so a contest
-    scanned this week can be missing from it while being exactly the one worth
-    checking. Contests I did not enter answer null and are skipped.
+    Scanning is what puts a contest on the list, and the rank recorded at that
+    first scan is the baseline. Contests entered long before the app existed
+    are left alone: nothing here moved them, so there is nothing to measure.
     """
     if _pipeline.running:
         return {"ok": False, "error": "a scan is running; it shares the browser"}
@@ -162,8 +161,7 @@ def refresh_all_ranks():
         with Session() as session:
             session.require_login()
             who = session.whoami()
-            slugs = sorted(set(contest.attended_slugs(session, who))
-                           | set(store.known_contests(conn)))
+            slugs = store.scanned_contests(conn)
             checked = changed = skipped = 0
             for slug in slugs:
                 rank = contest.my_rank(session, slug, who)
