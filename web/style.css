@@ -36,6 +36,10 @@ button.pill:disabled { opacity: .55; cursor: default; }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field > span { font-size: 10.5px; color: var(--dim); text-transform: uppercase;
                 letter-spacing: .05em; }
+/* The row is bottom-aligned so the inputs line up under their labels, which
+   leaves this note sitting on the buttons' bottom edge. Lift it to their
+   centre: half the difference between a 39px button and its 19px text. */
+#blocked { padding-bottom: 10px; }
 input {
   background: var(--panel); border: 1px solid var(--line); color: var(--fg);
   padding: 9px 12px; border-radius: 7px; width: 190px; font: inherit;
@@ -49,6 +53,11 @@ button {
 button:hover:not(:disabled) { background: var(--hover); }
 button:disabled { opacity: .4; cursor: not-allowed; }
 button.primary { border-color: #573f18; color: var(--accent); font-weight: 600; }
+/* A disabled primary must not stay the brightest thing on the row. Dimming
+   alone does not do it -- accent orange is still vivid at 40% -- so it drops
+   the accent entirely and reads as what it is. */
+button.primary:disabled { color: var(--dim); border-color: var(--line);
+                          font-weight: 500; }
 button.danger { color: var(--danger); }
 button.ghost { border: none; background: none; color: var(--dim); padding: 3px 7px;
                font-size: 12px; }
@@ -95,7 +104,13 @@ button.ghost:hover:not(:disabled) { color: var(--fg); background: none; }
 .tab:hover:not(:disabled) { background: none; color: var(--fg); }
 .tab.active { color: var(--fg); border-bottom-color: var(--accent); }
 .panel { display: none; }
-.panel.active { display: block; }
+/* My rank carries eight columns. In the narrow layout they used to squeeze
+   until "weekly-contest-515" broke across three lines; let the panel scroll
+   sideways instead and keep every cell on one line. */
+.panel.active { display: block; overflow-x: auto; }
+.panel th, .panel td { white-space: nowrap; }
+/* Reasons are the one column meant to wrap -- they are a bag of badges. */
+.panel td:has(.badge) { white-space: normal; }
 .empty { padding: 26px 16px; text-align: center; margin: 0; font-size: 12.5px; }
 
 /* The log is always visible: it is the only view of what a scan is doing, so
