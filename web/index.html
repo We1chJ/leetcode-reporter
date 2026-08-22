@@ -14,7 +14,21 @@
   <button id="mode" class="pill" title="Switch between dry run and live">…</button>
 </header>
 
-<!-- What must be true before a scan can run. Stays up until it is. -->
+<!-- Nothing here works without a signed-in Chrome: not scanning, not reading
+     my own rank. When that is missing it is the only thing worth showing, so
+     it takes the whole screen rather than sitting in a strip to be scrolled
+     past. -->
+<div id="gate" class="gate" hidden>
+  <div class="gate-card" role="dialog" aria-modal="true" aria-labelledby="gate-title">
+    <h2 id="gate-title">Set up the browser first</h2>
+    <p class="gate-lead">LeetCode is behind Cloudflare and only answers a real
+      signed-in browser. Until this is done, nothing in the app can reach it.</p>
+    <div id="gate-steps"></div>
+    <button id="gate-dismiss" class="ghost">View stored results anyway</button>
+  </div>
+</div>
+
+<!-- The ready state and the live-reporting warning, once setup is done. -->
 <section id="setup" class="setup"></section>
 
 <section class="controls">

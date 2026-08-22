@@ -15,6 +15,7 @@ let scope = { rank_start: 1, rank_end: 100 };
 let scanning = false;
 let paused = false;
 let setupReady = false;
+let gateDismissed = false;
 let dryRun = true;
 
 const totalRanks = () => Math.max(0, scope.rank_end - scope.rank_start + 1);
@@ -90,6 +91,14 @@ function setRunning(on) {
     scan.disabled = on || !setupReady || !haveSlug;
     scan.textContent = on ? (paused ? "Paused" : "Scanning…") : "Start scanning";
   }
+  // Reading my rank needs the same signed-in browser a scan does, and it
+  // shares the page with a running scan, so it is out during both.
+  const rank = $("#rankrefresh");
+  if (rank) {
+    rank.disabled = on || !setupReady;
+    rank.title = !setupReady ? "Set up the browser first"
+      : on ? "A scan is running; it shares the browser" : "";
+  }
   $("#blocked").textContent = on ? ""
     : !setupReady ? "Finish setup to scan."
     : !haveSlug ? "Enter a contest number." : "";
@@ -159,6 +168,12 @@ if ($("#pause")) $("#pause").onclick = async () => {
 // and it never touches a submission.
 if ($("#rankrefresh")) $("#rankrefresh").onclick = async () => {
   const msg = $("#rankmsg"), btn = $("#rankrefresh");
+  if (!setupReady) {
+    gateDismissed = false;
+    refreshSetup();
+    msg.textContent = "The browser is not set up yet.";
+    return;
+  }
   btn.disabled = true; btn.textContent = "Reading…";
   msg.textContent = "Reading every contest you have entered…";
   try {
@@ -243,7 +258,29 @@ async function refreshSetup() {
         ? { label: "Re-check", id: "recheck" } : null },
   ];
 
+  const wasReady = setupReady;
   setupReady = steps.every((s) => s.ok);
+  // Setup breaking again after it worked -- the browser closed, the session
+  // expired -- has to raise the gate again, whatever was dismissed before.
+  if (wasReady && !setupReady) gateDismissed = false;
+  if (setupReady) gateDismissed = false;
+
+  const stepsHtml = steps.map((s, i) => `
+        <div class="step ${s.ok ? "ok" : "todo"}">
+          <span class="dot">${s.ok ? "✓" : i + 1}</span>
+          <span class="step-text">
+            <b>${esc(s.title)}</b>
+            <span class="dim">${esc(s.ok ? s.done : s.todo)}</span>
+          </span>
+          ${s.action ? `<button id="${s.action.id}">${esc(s.action.label)}</button>` : ""}
+        </div>`).join("");
+
+  const gate = $("#gate");
+  if (gate) {
+    gate.hidden = setupReady || gateDismissed;
+    $("#gate-steps").innerHTML = stepsHtml;
+  }
+
   const el = $("#setup");
   el.className = "setup" + (setupReady ? " ready" : "");
 
@@ -257,19 +294,19 @@ async function refreshSetup() {
       `<b>Ready to scan</b><span class="dim">Chrome running, signed in as ` +
       `${esc(st.signed_in_as)}</span></span>` +
       `<button id="recheck" class="ghost">Re-check</button></div>`
-    : `<p class="setup-head">Set up before scanning</p>` +
-      steps.map((s, i) => `
-        <div class="step ${s.ok ? "ok" : "todo"}">
-          <span class="dot">${s.ok ? "✓" : i + 1}</span>
-          <span class="step-text">
-            <b>${esc(s.title)}</b>
-            <span class="dim">${esc(s.ok ? s.done : s.todo)}</span>
-          </span>
-          ${s.action ? `<button id="${s.action.id}">${esc(s.action.label)}</button>` : ""}
-        </div>`).join(""));
+    : `<p class="setup-head">Not set up — the browser is not ready.</p>` +
+      `<button id="gate-show" class="ghost">Show me what to do</button>`);
 
   // Scanning without a signed-in browser only ever produces a failed scan.
   if (!scanning) setRunning(false);
+
+  const show = $("#gate-show");
+  if (show) show.onclick = () => { gateDismissed = false; refreshSetup(); };
+  const dismiss = $("#gate-dismiss");
+  if (dismiss) dismiss.onclick = () => {
+    gateDismissed = true;
+    if ($("#gate")) $("#gate").hidden = true;
+  };
 
   const start = $("#start-browser");
   if (start) start.onclick = async () => {
@@ -358,4 +395,7 @@ async function refresh() {
 }
 
 refresh();
-setInterval(refreshSetup, 10000);   // notice a browser closed behind our back
+// Ten seconds is fine for noticing a browser that closed behind our back, but
+// far too slow when someone is standing at the gate waiting for it to lift.
+setInterval(() => refreshSetup(), 10000);
+setInterval(() => { if (!setupReady) refreshSetup(); }, 2500);
