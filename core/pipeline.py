@@ -26,6 +26,9 @@ class Pipeline:
         self._stop = threading.Event()
         self._pause = threading.Event()
         self.running = False
+        # The running scan's contest, range and counts, so a dashboard opened
+        # mid-scan can show the right ones instead of its defaults.
+        self.current = None
 
     @property
     def paused(self):
@@ -91,10 +94,15 @@ class Pipeline:
         scan_id = store.start_scan(conn, contest_slug)
         scanned = inspected = flagged = reported = 0
         last_report_at = 0.0
+        # Where the time goes, for the closing summary.
+        inspect_secs = file_secs = 0.0
+        file_attempts = 0
         status = "done"
 
         # The range goes out with the event so the UI counts against what is
         # actually being scanned, not what the config file happens to say.
+        self.current = {"contest": contest_slug, "rank_start": scope["rank_start"],
+                        "rank_end": scope["rank_end"], "rank": None, "reported": 0}
         self.emit({"type": "scan_start", "contest": contest_slug,
                    "dry_run": dry_run, "rank_start": scope["rank_start"],
                    "rank_end": scope["rank_end"]})
@@ -150,6 +158,7 @@ class Pipeline:
                         break
                     scanned += 1
                     username = row["username"]
+                    self.current["rank"] = row["rank"]
                     self.emit({"type": "progress", "rank": row["rank"], "user": username})
 
                     dates = [s["date"] for s in row["submissions"].values() if s.get("date")]
@@ -182,6 +191,7 @@ class Pipeline:
                         # "nothing to see".
                         evs = None
                         ctx_progression = None
+                        t0 = time.time()
                         if sub.get("has_replay"):
                             try:
                                 got = replay.inspect(
@@ -192,7 +202,8 @@ class Pipeline:
                                     rank=row["rank"],
                                     finish_offset=(row["finish_time"] -
                                                    meta["start_time"])
-                                    if row.get("finish_time") else None)
+                                    if row.get("finish_time") else None,
+                                    keep_open=True)
                                 if got:
                                     evs = got["events"]
                                     ctx_progression = got["progression"]
@@ -204,6 +215,8 @@ class Pipeline:
                                 self.emit({"type": "log", "level": "warn",
                                            "msg": f"{username} {qslug}: "
                                                   f"replay unreadable ({exc})"})
+
+                        inspect_secs += time.time() - t0
 
                         ctx = {"start_time": meta["start_time"],
                                "credit": credit.get(qid),
@@ -268,7 +281,11 @@ class Pipeline:
                         if not self._go():
                             break
 
+                        t0 = time.time()
+                        file_attempts += 1
                         try:
+                            # The replay inspected above is still open, so the
+                            # report is filed from it rather than reopening it.
                             outcome = reporter.file_report(
                                 session, contest_slug=contest_slug, username=username,
                                 question_index=index_of[qid], narrative=text,
@@ -278,26 +295,46 @@ class Pipeline:
                                 rank=row["rank"],
                                 finish_offset=(row["finish_time"] -
                                                meta["start_time"])
-                                if row.get("finish_time") else None)
+                                if row.get("finish_time") else None,
+                                modal_open=evs is not None)
                             store.mark_report(conn, report_id, outcome)
                         except Exception as exc:
+                            file_secs += time.time() - t0
                             store.mark_report(conn, report_id, "failed", str(exc))
                             self.emit({"type": "log", "level": "error",
                                        "msg": f"report {username}: {exc}"})
                             continue
+                        took = time.time() - t0
+                        file_secs += took
 
                         last_report_at = time.time()
                         reported += 1
+                        self.current["reported"] = reported
                         self.emit({"type": "report", "user": username,
                                    "question": ctx["question_slug"], "reason": reason,
-                                   "score": score, "outcome": outcome})
+                                   "score": score, "outcome": outcome,
+                                   "secs": round(took, 1)})
+                # The last replay may still be open from keep_open.
+                try:
+                    replay._close(session.page)
+                except Exception:
+                    pass
         except Exception as exc:
             status = "error"
             self.emit({"type": "log", "level": "error", "msg": f"scan failed: {exc}"})
         finally:
+            if inspected or file_attempts:
+                def avg(total, n):
+                    return f"{total / n:.1f}s each" if n else "-"
+                self.emit({"type": "log",
+                           "msg": f"Timing: {inspected} replays read in "
+                                  f"{inspect_secs:.0f}s ({avg(inspect_secs, inspected)}); "
+                                  f"{file_attempts} report attempts in "
+                                  f"{file_secs:.0f}s ({avg(file_secs, file_attempts)})."})
             store.finish_scan(conn, scan_id, scanned, inspected, flagged,
                               reported, status)
             conn.close()
+            self.current = None
             self.running = False
             self.emit({"type": "scan_end", "status": status, "scanned": scanned,
                        "inspected": inspected, "flagged": flagged,

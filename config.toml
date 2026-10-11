@@ -13,7 +13,7 @@ max_reports_per_contest = 400
 # with evidence behind it is ~49s, which filed 72 reports without a failure.
 # It is a choice about how conspicuous a run looks, not a technical ceiling.
 # Reports are filed under your own account and name each accused contestant.
-min_seconds_between_reports = 20
+min_seconds_between_reports = 0
 
 [scope]
 # Leaderboard rank range to scan (inclusive, 1-based).
@@ -22,7 +22,7 @@ rank_end = 100
 # Which contest problems to inspect. Empty list means all of them.
 questions = []
 # Seconds to wait between ranking/replay requests.
-request_delay = 1.0
+request_delay = 0
 
 [detect]
 # Score at or above which a submission is reported without asking the model.

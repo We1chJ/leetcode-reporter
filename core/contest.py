@@ -51,6 +51,14 @@ def _get(session, url):
     return data
 
 
+def _get_many(session, urls):
+    out = session.get_json_many(urls)
+    for url, data in zip(urls, out):
+        if isinstance(data, dict) and "__error" in data:
+            raise RuntimeError(f"{url}: HTTP {data['__error']}")
+    return out
+
+
 def info(session, slug):
     """Contest metadata. `start_time` is epoch seconds; `duration` is seconds."""
     data = _get(session, INFO.format(slug=slug))
@@ -70,8 +78,10 @@ def questions(session, slug):
 
 def _page(session, slug, page):
     """Merge the two region payloads for one page of 25 contestants."""
-    v1 = _get(session, RANKING.format(slug=slug, page=page, region="global"))
-    v2 = _get(session, RANKING.format(slug=slug, page=page, region="global_v2"))
+    # Both regions in one round trip rather than one after the other.
+    v1, v2 = _get_many(session, [
+        RANKING.format(slug=slug, page=page, region="global"),
+        RANKING.format(slug=slug, page=page, region="global_v2")])
     rows_v1 = (v1 or {}).get("total_rank") or []
     subs_v1 = (v1 or {}).get("submissions") or []
     rows_v2 = (v2 or {}).get("total_rank") or []

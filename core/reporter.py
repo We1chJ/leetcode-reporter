@@ -74,7 +74,7 @@ _DISPATCH = """el => {
 }"""
 
 
-def _click(locator, timeout_ms=5_000):
+def _click(locator, timeout_ms=3_000, fallback_ms=2_000):
     """Click through the modal overlay.
 
     The replay modal lays a full-screen overlay over the page, which swallows
@@ -83,7 +83,9 @@ def _click(locator, timeout_ms=5_000):
     try:
         locator.click(timeout=timeout_ms)
     except Exception:
-        locator.evaluate(_DISPATCH)
+        # Without its own timeout this waited Playwright's default 30s for an
+        # element that had usually already gone.
+        locator.evaluate(_DISPATCH, timeout=fallback_ms)
 
 
 def open_submission(session, contest_slug, username, question_index,
@@ -113,14 +115,14 @@ def open_submission(session, contest_slug, username, question_index,
     # the open dialog, so it has to wait for one to exist first -- calling it
     # too early finds nothing and passes a China offer straight through.
     try:
-        page.wait_for_selector("div[role='dialog']", timeout=8_000)
+        page.wait_for_selector("div[role='dialog']", timeout=5_000)
     except Exception:
         pass
     replay._decline_china_redirect(page)
-    page.get_by_text("Report Cheating", exact=False).first.wait_for(timeout=20_000)
+    page.get_by_text("Report Cheating", exact=False).first.wait_for(timeout=5_000)
 
 
-def open_report_form(page, timeout_ms=15_000):
+def open_report_form(page, timeout_ms=5_000):
     """Click "Report Cheating" and wait for its textarea."""
     ctl = page.get_by_text("Report Cheating", exact=False).first
     ctl.wait_for(timeout=timeout_ms)
@@ -177,11 +179,29 @@ def submit_report(session, narrative, dry_run=True):
     if not submit.count():
         raise ReportError("no Submit button in the report dialog")
     _click(submit)
-    time.sleep(2)
     return "submitted"
 
 
-def confirm_registered(session, contest_submission_id, tries=6):
+def _report_control_ready(page, timeout_ms=2_000):
+    """True if the open replay modal already shows its Report Cheating control."""
+    try:
+        page.get_by_text("Report Cheating", exact=False).first.wait_for(
+            timeout=timeout_ms)
+        return True
+    except Exception:
+        return False
+
+
+def _dismiss(page, presses=3):
+    """Press Escape until no dialog is open, giving up after a few presses."""
+    for _ in range(presses):
+        if not page.locator("div[role='dialog']").count():
+            return
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
+
+def confirm_registered(session, contest_submission_id, tries=40):
     """Ask LeetCode whether the report actually landed.
 
     A click that silently failed would otherwise be counted as a report sent,
@@ -189,27 +209,39 @@ def confirm_registered(session, contest_submission_id, tries=6):
 
     LeetCode does not always answer yes immediately after the dialog closes.
     Three tries at 1.5s gave up after 4.5s and marked landed reports failed, so
-    back off over roughly 20s, returning the moment it shows up.
+    keep asking every 0.5s for roughly 20s, returning the moment it shows up.
     """
     for attempt in range(tries):
         if replay.existing_report(session, contest_submission_id):
             return True
         if attempt < tries - 1:
-            time.sleep(min(1.5 * (attempt + 1), 6))
+            time.sleep(0.5)
     return False
 
 
 def file_report(session, *, contest_slug, username, question_index, narrative,
                 problem_count=4, ui_page=1, dry_run=True,
-                contest_submission_id=None, rank=None, finish_offset=None):
-    """Full report flow for one submission. Returns the outcome string."""
+                contest_submission_id=None, rank=None, finish_offset=None,
+                modal_open=False):
+    """Full report flow for one submission. Returns the outcome string.
+
+    `modal_open` says the detection pass left this submission's replay on
+    screen; filing from it skips finding the row and opening it again.
+    """
     if dry_run:
         # Never touch the network in dry-run; the narrative is already persisted.
         return "dry_run"
-    open_submission(session, contest_slug, username, question_index,
-                    problem_count, ui_page, rank=rank,
-                    finish_offset=finish_offset)
-    outcome = submit_report(session, narrative, dry_run=False)
+    try:
+        if not (modal_open and _report_control_ready(session.page)):
+            open_submission(session, contest_slug, username, question_index,
+                            problem_count, ui_page, rank=rank,
+                            finish_offset=finish_offset)
+        outcome = submit_report(session, narrative, dry_run=False)
+    except Exception:
+        # Some submissions open without a usable report control. Close whatever
+        # is left open so the next contestant starts from a clear board.
+        _dismiss(session.page)
+        raise
     if contest_submission_id and not confirm_registered(session,
                                                         contest_submission_id):
         raise ReportError("submitted, but LeetCode does not show the report")

@@ -4,7 +4,6 @@ import json
 import queue
 import re
 import threading
-import time
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
@@ -49,7 +48,7 @@ def get_config():
     cfg = config.load(reload=True)
     return {"safety": cfg["safety"], "scope": cfg["scope"],
             "detect": cfg["detect"], "running": _pipeline.running,
-            "paused": _pipeline.paused}
+            "paused": _pipeline.paused, "scan": _pipeline.current}
 
 
 @app.post("/api/scan/{contest_slug}")
@@ -171,7 +170,6 @@ def refresh_all_ranks():
                 checked += 1
                 if store.record_rank(conn, slug, who, rank) is not None:
                     changed += 1
-                time.sleep(0.2)          # a courtesy gap, not a required one
         return {"ok": True, "username": who, "contests": checked,
                 "changed": changed, "skipped": skipped,
                 "progress": store.rank_progress(conn, who)}

@@ -330,6 +330,15 @@ async function refresh() {
     setRunning(scanning);
   }
   if (!scanning) scope = cfg.scope;
+  // A page opened mid-scan never saw scan_start, so take the running scan's
+  // contest, range and count from the server rather than the defaults.
+  if (scanning && cfg.scan) {
+    scope = { rank_start: cfg.scan.rank_start, rank_end: cfg.scan.rank_end };
+    currentContest = cfg.scan.contest;
+    reportedSoFar = cfg.scan.reported;
+    lastRank = cfg.scan.rank;
+    showProgress({ rank: lastRank, inspected: reportedSoFar, contest: currentContest });
+  }
   const dry = cfg.safety.dry_run;
   dryRun = dry;
   showMode();

@@ -143,6 +143,18 @@ class Session:
         if not self.whoami():
             raise RuntimeError("login did not complete")
 
+    def get_json_many(self, urls):
+        """Fetch several JSON URLs at once, from inside the page like get_json."""
+        return self.page.evaluate(
+            """async (urls) => Promise.all(urls.map(async (u) => {
+                const r = await fetch(u, {credentials: 'include',
+                                          headers: {'Accept': 'application/json'}});
+                if (!r.ok) return {__error: r.status};
+                return await r.json();
+            }))""",
+            urls,
+        )
+
     def get_json(self, url):
         """Fetch JSON from inside the page so cookies and CF clearance apply."""
         return self.page.evaluate(

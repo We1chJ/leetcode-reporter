@@ -233,7 +233,6 @@ def events(session, contest_slug, username, question_index, problem_count=4,
             got = None
         if got:
             return got
-        session.page.wait_for_timeout(700)
         # Force a reload before the final try, in case the board drifted.
         if attempt == attempts - 2:
             try:
@@ -259,16 +258,29 @@ CHINA_HINT = re.compile(r"LeetCode China|leetcode\.cn|力扣", re.I)
 STAY_BUTTON = re.compile(r"Return to Contest Page|Cancel|No, thanks", re.I)
 
 PROGRESSION_SAMPLES = 12
-SAMPLE_SETTLE_MS = 260
+# Longest to wait for a seek to show on the player's clock. It normally shows
+# in a fraction of this; the cap only matters when a seek lands on the same
+# second as the previous one.
+SEEK_TIMEOUT_MS = 300
+# Margin after the clock has moved, for the editor to finish drawing the frame.
+SAMPLE_RENDER_MS = 40
 
-# Total characters of code currently shown in the player (CodeMirror lines).
-JS_CODE_CHARS = ("() => [...document.querySelectorAll('.cm-line')]"
-                 ".reduce((n, l) => n + (l.innerText || '').length, 0)")
+# One reading of the player: the "current / total" clock, used to confirm a
+# seek actually moved, and the characters of code on screen (CodeMirror lines).
+# Read together, and from the dialog rather than the whole page, because
+# innerText forces a layout of everything it covers.
+JS_SAMPLE = r"""() => {
+    const d = document.querySelector('div[role="dialog"]') || document.body;
+    const m = d.innerText.match(/(\d+:\d{2})\s*\/\s*(\d+:\d{2})/);
+    const chars = [...document.querySelectorAll('.cm-line')]
+        .reduce((n, l) => n + (l.innerText || '').length, 0);
+    return {head: m ? m[1] : null, chars};
+}"""
 
-# The player's "current / total" clock, used to confirm a seek actually moved.
-JS_PLAYHEAD = r"""() => {
-    const m = document.body.innerText.match(/(\d+:\d{2})\s*\/\s*(\d+:\d{2})/);
-    return m ? m[1] : null;
+JS_HEAD_MOVED = r"""(prev) => {
+    const d = document.querySelector('div[role="dialog"]') || document.body;
+    const m = d.innerText.match(/(\d+:\d{2})\s*\/\s*(\d+:\d{2})/);
+    return !!m && m[1] !== prev;
 }"""
 
 # The scrub track: the widest thin element in the lower part of the modal.
@@ -346,8 +358,13 @@ def _decline_china_redirect(page):
 
 def _read_events(page):
     """The Event History rows, or None if the panel never rendered."""
-    if _wait_container(page, 2_000) is None:
-        _open_event_list(page)
+    # Read the toggle's own state rather than waiting to see whether rows turn
+    # up: that wait cost 2s on every submission whose panel started closed.
+    try:
+        page.locator("button[aria-pressed]").last.wait_for(timeout=3_000)
+    except Exception:
+        pass
+    _open_event_list(page)
     container = _wait_container(page, 8_000)
     if container is None:
         return None
@@ -368,12 +385,23 @@ def _read_progression(page, samples=PROGRESSION_SAMPLES):
         return None
     y = tr["y"] + tr["h"] / 2
     out, heads = [], []
+    prev = page.evaluate(JS_SAMPLE)["head"]
     for i in range(samples):
         f = i / (samples - 1)
         page.mouse.click(tr["x"] + 2 + f * (tr["w"] - 4), y)
-        page.wait_for_timeout(SAMPLE_SETTLE_MS)
-        out.append(page.evaluate(JS_CODE_CHARS))
-        heads.append(page.evaluate(JS_PLAYHEAD))
+        # Wait for the clock to show the seek rather than a flat 260ms. The
+        # frame is usually there much sooner, and when it was slower the fixed
+        # wait read the previous frame as this one.
+        try:
+            page.wait_for_function(JS_HEAD_MOVED, arg=prev,
+                                   timeout=SEEK_TIMEOUT_MS, polling=25)
+        except Exception:
+            pass          # same second as the last sample, or no seek at all
+        page.wait_for_timeout(SAMPLE_RENDER_MS)
+        s = page.evaluate(JS_SAMPLE)
+        out.append(s["chars"])
+        heads.append(s["head"])
+        prev = s["head"]
 
     # If the playhead never moved, the clicks did not seek and every sample is
     # the same frame. That is a scrape failure, not evidence -- and it must not
@@ -396,11 +424,14 @@ def _events_once(session, contest_slug, username, question_index, problem_count,
 
 def inspect(session, contest_slug, username, question_index, problem_count=4,
             ui_page=1, timeout_ms=15_000, samples=PROGRESSION_SAMPLES,
-            attempts=2, rank=None, finish_offset=None, always_progression=False):
+            attempts=2, rank=None, finish_offset=None, always_progression=False,
+            keep_open=False):
     """Open a submission once and read both its history and its growth curve.
 
     Returns {"events": [...], "progression": [chars, ...]} or None. One modal
-    open per submission, since opening is the slow part.
+    open per submission, since opening is the slow part. With `keep_open` the
+    modal is left on screen after a successful read, so the caller can file a
+    report from it instead of finding the row and opening it a second time.
     """
     last_error = None
     for attempt in range(attempts):
@@ -416,14 +447,15 @@ def inspect(session, contest_slug, username, question_index, problem_count=4,
             has_paste = bool(evs) and any(e["type"] == PASTE for e in evs)
             prog = (None if has_paste and not always_progression
                     else _read_progression(page, samples))
-            _close(page)
-            if prog or has_paste:
+            ok = bool(prog or has_paste)
+            if not (keep_open and ok):
+                _close(page)
+            if ok:
                 return {"events": evs or [], "progression": prog}
         except ChinaAccountRedirect:
             raise
         except Exception as exc:
             last_error = exc
-        session.page.wait_for_timeout(700)
     if last_error is not None:
         raise last_error
     return None
